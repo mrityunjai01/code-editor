@@ -1,0 +1,88 @@
+.app {
+  display: flex;
+  height: 100vh;
+  background: #ffffff;
+  color: #333;
+}
+
+.editor-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  border-bottom: 1px solid #e1e5e9;
+  background: #f8f9fa;
+}
+
+.editor-header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.status-indicator {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-weight: 500;
+  font-size: 0.8rem;
+}
+
+.status-indicator.connected {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-indicator.disconnected {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.room-info {
+  color: #6c757d;
+  font-size: 0.8rem;
+}
+
+.editor-wrapper {
+  flex: 1;
+  padding: 2rem;
+  background: #ffffff;
+  min-height: 0;
+}
+
+.editor-wrapper .ql-editor {
+  min-height: calc(100vh - 200px);
+  font-size: 16px;
+  line-height: 1.6;
+  padding: 2rem;
+}
+
+.editor-wrapper .ql-toolbar {
+  border: 1px solid #e1e5e9;
+  border-bottom: none;
+  background: #f8f9fa;
+}
+
+.editor-wrapper .ql-container {
+  border: 1px solid #e1e5e9;
+  border-radius: 0 0 8px 8px;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.editor-wrapper .ql-toolbar.ql-snow {
+  border-radius: 8px 8px 0 0;
+}

@@ -1,0 +1,33 @@
+{
+  "name": "collaborative-text-editor",
+  "version": "1.0.0",
+  "description": "Real-time collaborative text editor with WebSocket backend",
+  "main": "server/main.py",
+  "scripts": {
+    "start": "cd server && python main.py",
+    "dev": "cd server && python main.py",
+    "client": "http-server client -p 3000 -c-1",
+    "dev:client": "vite client --port 3000",
+    "build:client": "vite build client",
+    "install:python": "pip install -r requirements.txt"
+  },
+  "dependencies": {
+    "ws": "^8.13.0",
+    "uuid": "^9.0.0",
+    "vue": "^3.4.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "http-server": "^14.1.1",
+    "vite": "^5.0.0",
+    "@vitejs/plugin-vue": "^5.0.0"
+  },
+  "keywords": [
+    "collaborative",
+    "text-editor",
+    "websocket",
+    "real-time"
+  ],
+  "author": "",
+  "license": "MIT"
+}
