@@ -1,4 +1,5 @@
 import { editor } from "monaco-editor";
+import { faker } from "@faker-js/faker";
 
 export interface Cursor {
   id: string;
@@ -7,6 +8,7 @@ export interface Cursor {
   ln: number;
   color: string;
   isMain?: boolean;
+  isTyping?: boolean;
   options?: editor.IModelDecorationOptions;
 }
 
@@ -51,7 +53,6 @@ export class CursorManager {
     const existing = this.cursors.get(id);
     if (existing) {
       this.cursors.set(id, { ...existing, ...updates });
-      console.log("changed cursor to ", this.cursors.get(id));
       this.reinitializeDecorations();
       this.notifyChange();
     }
@@ -67,8 +68,17 @@ export class CursorManager {
     return Array.from(this.cursors.values());
   }
 
-  getMainCursor(): Cursor | undefined {
+  getMaineursor(): Cursor | undefined {
     return Array.from(this.cursors.values()).find((cursor) => cursor.isMain);
+  }
+
+  updateTypingStatus(id: string, isTyping: boolean) {
+    const existing = this.cursors.get(id);
+    if (existing) {
+      this.cursors.set(id, { ...existing, isTyping });
+      this.reinitializeDecorations();
+      this.notifyChange();
+    }
   }
 
   private reinitializeDecorations(): void {
@@ -84,7 +94,7 @@ export class CursorManager {
           beforeContentClassName: "remote-cursor-line",
           stickiness: 1, // NeverGrowsWhenTypingAtEdges
           hoverMessage: {
-            value: `**${cursor.name}**\nLine: ${cursor.ln + 1}, Column: ${cursor.pos + 1}`,
+            value: `**${cursor.name}**${cursor.isTyping ? " (typing...)" : ""}\nLine: ${cursor.ln + 1}, Column: ${cursor.pos + 1}`,
           },
         };
 
@@ -200,36 +210,15 @@ export const DEFAULT_COLORS = [
   "#F8C471", // Orange
 ];
 
-export const createInitialCursors = (): Cursor[] => {
-  const cursors: Cursor[] = [
+export const createInitialCursors = (user_name: string): Cursor[] => {
+  return [
     {
       id: "main",
-      name: "You",
+      name: user_name,
       pos: 0,
       ln: 0,
       color: "#007ACC",
       isMain: true,
     },
   ];
-
-  // Add 10 remote cursors with custom decoration options
-  for (let i = 0; i < 1; i++) {
-    cursors.push({
-      id: `remote-${i}`,
-      name: `User ${i + 1}`,
-      pos: 0,
-      ln: i,
-      color: DEFAULT_COLORS[i],
-      options: {
-        className: `remote-cursor-${i} user-cursor`,
-        glyphMarginClassName: `remote-cursor-glyph cursor-${i}`,
-        stickiness: 1,
-        hoverMessage: {
-          value: `**User ${i + 1}** is here\nLine: ${i + 1}, Column: 1`,
-        },
-      },
-    });
-  }
-
-  return cursors;
 };

@@ -1,12 +1,57 @@
 import { editor } from "monaco-editor";
 
-export interface Delta {
+export interface Blob {
   type: "insert" | "delete" | "replace";
   pos: number;
   ln: number;
   data?: string;
   steps?: number;
 }
+
+export interface Delta {
+  startLine: number;
+  startCol: number;
+  endLine: number;
+  endCol: number;
+  text: string;
+}
+
+// reversible delta
+export interface rDelta {
+  startLine: number;
+  startCol: number;
+  endLine: number;
+  endCol: number;
+  text: string;
+  sourceText: string;
+}
+
+export interface TextSpan {
+  linespan: number;
+  colspan: number;
+}
+
+// if linespan is 0, then colspan is relative to the start of hte range
+export const getTextSpan = (text: string): TextSpan => {
+  const lastNewlineIndex = text.lastIndexOf("\n");
+  const lastNewlineDistance =
+    lastNewlineIndex !== -1 ? text.length - lastNewlineIndex - 1 : text.length;
+  const newlineCount = (text.match(/\n/g) || []).length;
+  return { linespan: newlineCount, colspan: lastNewlineDistance };
+};
+
+export const reverseDelta = (delta: rDelta): rDelta => {
+  const { sourceText, startLine, startCol } = delta;
+  const span = getTextSpan(sourceText);
+  return {
+    startLine: startLine,
+    startCol: startCol,
+    endLine: startLine + span["linespan"],
+    endCol: startCol + span["colspan"],
+    sourceText: delta.text,
+    text: sourceText,
+  };
+};
 
 export const applyDeltasToEditor = (
   editorInstance: editor.IStandaloneCodeEditor,
@@ -15,79 +60,23 @@ export const applyDeltasToEditor = (
   const model = editorInstance.getModel();
   if (!model) return;
 
-  const edits: editor.IIdentifiedSingleEditOperation[] = deltas.map((delta) => {
-    const { type, pos, ln, data = "", steps = 0 } = delta;
-
-    switch (type) {
-      case "insert":
-        return {
-          range: {
-            startLineNumber: ln + 1,
-            startColumn: pos + 1,
-            endLineNumber: ln + 1,
-            endColumn: pos + 1
-          },
-          text: data,
-          forceMoveMarkers: true,
-        };
-
-      case "delete":
-        return {
-          range: {
-            startLineNumber: ln + 1,
-            startColumn: pos + 1,
-            endLineNumber: ln + 1,
-            endColumn: pos + 1 + steps
-          },
-          text: "",
-          forceMoveMarkers: true,
-        };
-
-      case "replace":
-        return {
-          range: {
-            startLineNumber: ln + 1,
-            startColumn: pos + 1,
-            endLineNumber: ln + 1,
-            endColumn: pos + 1 + steps
-          },
-          text: data,
-          forceMoveMarkers: true,
-        };
-
-      default:
-        throw new Error(`Unsupported delta type: ${type}`);
-    }
-  });
+  const edits: editor.IIdentifiedSingleEditOperation[] = deltas.map(
+    ({ startLine, startCol, endLine, endCol, text }) => ({
+      range: {
+        startLineNumber: startLine,
+        startColumn: startCol,
+        endLineNumber: endLine,
+        endColumn: endCol,
+      },
+      text: text,
+    }),
+  );
 
   model.pushEditOperations([], edits, () => null);
 };
 
-export const applyDeltaToText = (text: string, delta: Delta): string => {
-  const lines = text.split("\n");
-  const { type, pos, ln, data = "", steps = 0 } = delta;
-
-  if (ln >= lines.length) return text;
-
-  const line = lines[ln];
-
-  switch (type) {
-    case "insert":
-      lines[ln] = line.slice(0, pos) + data + line.slice(pos);
-      break;
-
-    case "delete":
-      lines[ln] = line.slice(0, pos) + line.slice(pos + steps);
-      break;
-
-    case "replace":
-      lines[ln] = line.slice(0, pos) + data + line.slice(pos + steps);
-      break;
-
-    default:
-      throw new Error(`Unsupported delta type: ${type}`);
-  }
-
-  return lines.join("\n");
-};
-
+// we want to transform source rdelta to shift its form so it can be applied after base rdelta
+export const transformRDelta = (
+  source_delta: rDelta,
+  base_delta: Delta,
+): rDelta => {};
