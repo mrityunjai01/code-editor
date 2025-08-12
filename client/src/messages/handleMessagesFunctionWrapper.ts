@@ -10,23 +10,22 @@ export const handleMessagesFunctionWrapper = (
   setCursors: (cursors: Cursor[]) => void,
 ) => {
   return (messages: any) => {
-    console.log("messages = ", messages);
     // check if it is a list
     if (!Array.isArray(messages)) {
       messages = [messages];
     }
     for (const message of messages) {
-      console.log("processing message ", message);
       if (message.type === "connect_ack") {
         set_is_connected(true);
-        set_client_id(messages.client_id);
+        set_client_id(message.client_id);
       } else if (message.type === "update") {
       } else if (message.type === "cursor_update") {
         if (cursorManagerRef.current && message.client_id) {
           cursorManagerRef.current.updateCursor(message.client_id, {
-            pos: message.position.column - 1,
-            ln: message.position.line - 1,
+            pos: message.position.column,
+            ln: message.position.line,
           });
+          setCursors(cursorManagerRef.current.getCursors());
         }
       } else if (message.type === "typing_indicator") {
         if (cursorManagerRef.current && message.client_id) {
@@ -34,6 +33,7 @@ export const handleMessagesFunctionWrapper = (
             message.client_id,
             message.typing,
           );
+          setCursors(cursorManagerRef.current.getCursors());
         }
       } else if (message.type === "addclient") {
         if (cursorManagerRef.current) {

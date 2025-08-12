@@ -40,7 +40,6 @@ export class QueueManager {
 
   enqueue(event: QueueEvent) {
     this.queue_size += 1;
-    console.log("incrase queue size", this.queue_size);
     if (event.type == "typing") {
       this.typing = event.typing;
     }
@@ -57,7 +56,6 @@ export class QueueManager {
   flush_queue() {
     if (!this.client_id) {
       console.log("cant flush because no client id");
-
       return;
     }
     let messages: MessageType[] = [];
@@ -110,11 +108,15 @@ export const useQueue = (options: QueueOptions) => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (queue_manager.length() > threshold_queue) {
+      if (queue_manager_ref.current.length() > threshold_queue) {
         console.log("flushing ");
         queue_manager.flush_queue();
       } else {
-        console.log("not enough messages", queue_manager.length());
+        console.log(
+          "not enough messages",
+          queue_manager_ref.current.length(),
+          threshold_queue,
+        );
       }
     }, interval_delay);
 

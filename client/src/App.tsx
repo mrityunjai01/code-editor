@@ -69,12 +69,13 @@ function App() {
     set_client_id,
     editor_ready: change_handler !== null && cursorManagerRef.current !== null,
   });
+  const queueManagerRef = useRef<QueueManager>(new QueueManager(sendMessage));
 
   const { enqueue, update_connected_status } = useQueue({
     max_size: 15,
     threshold_queue: 1,
     interval_delay: 1000,
-    queue_manager: new QueueManager(sendMessage),
+    queue_manager: queueManagerRef.current,
   });
 
   // Update the connected status whenever isConnected changes

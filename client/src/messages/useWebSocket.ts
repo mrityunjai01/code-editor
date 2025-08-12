@@ -70,7 +70,6 @@ export const useWebSocket = (options: WebSocketOptions) => {
         console.log("received message", event.data);
         try {
           const message = JSON.parse(event.data);
-
           onMessage(message);
         } catch (error) {}
       };
@@ -149,7 +148,7 @@ export const useWebSocket = (options: WebSocketOptions) => {
 
   useEffect(() => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      console.log("change callback");
+      console.log("change callback", client_id);
       wsRef.current.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
