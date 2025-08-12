@@ -8,6 +8,7 @@ interface WebSocketOptions {
   client_id: string | null;
   set_is_connected: (arg: boolean) => void;
   set_client_id: (arg: any) => void;
+  editor_ready: boolean;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Event) => void;
@@ -25,6 +26,7 @@ export const useWebSocket = (options: WebSocketOptions) => {
     onConnect,
     onDisconnect,
     onError,
+    editor_ready,
   } = options;
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -38,7 +40,6 @@ export const useWebSocket = (options: WebSocketOptions) => {
       const ws = wsRef.current;
 
       ws.onopen = () => {
-        set_is_connected(true);
         setReconnectAttempts(0);
         console.log("WebSocket connected, reset to ", reconnectAttempts);
 
@@ -103,7 +104,16 @@ export const useWebSocket = (options: WebSocketOptions) => {
     } catch (error) {
       console.error("Error creating WebSocket connection:", error);
     }
-  }, [url, room_id, user_name, onConnect, onDisconnect, onError, onMessage]);
+  }, [
+    url,
+    room_id,
+    user_name,
+    client_id,
+    onConnect,
+    onDisconnect,
+    onError,
+    onMessage,
+  ]);
 
   const sendMessage = useCallback((message: any) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -130,12 +140,25 @@ export const useWebSocket = (options: WebSocketOptions) => {
   }, []);
 
   useEffect(() => {
-    connect();
+    if (editor_ready) connect();
 
     return () => {
       disconnect();
     };
-  }, []);
+  }, [editor_ready]);
+
+  useEffect(() => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      console.log("change callback");
+      wsRef.current.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+
+          onMessage(message);
+        } catch (error) {}
+      };
+    }
+  }, [onMessage, client_id]);
 
   return {
     sendMessage,

@@ -1,12 +1,12 @@
-import { EditorChangeHandler } from '../../editor/handle';
-import { Blob } from '../../editor/applyDeltas';
+import { EditorChangeHandler } from "../../editor/handle";
+import { Blob } from "../../editor/applyDeltas";
 
 // Mock the applyDeltas module
-jest.mock('../../editor/applyDeltas', () => ({
+jest.mock("../../editor/applyDeltas", () => ({
   applyDeltasToEditor: jest.fn(),
 }));
 
-describe('EditorChangeHandler', () => {
+describe("EditorChangeHandler", () => {
   let handler: EditorChangeHandler;
   let mockCallback: jest.Mock;
 
@@ -15,20 +15,20 @@ describe('EditorChangeHandler', () => {
     handler = new EditorChangeHandler(undefined, mockCallback);
   });
 
-  describe('Blob merging logic', () => {
-    test('should merge consecutive inserts on same line', () => {
+  describe("Blob merging logic", () => {
+    test("should merge consecutive inserts on same line", () => {
       const blob1: Blob = {
-        type: 'insert',
+        type: "insert",
         pos: 0,
         ln: 0,
-        data: 'Hello'
+        data: "Hello",
       };
 
       const blob2: Blob = {
-        type: 'insert',
+        type: "insert",
         pos: 5,
         ln: 0,
-        data: ' World'
+        data: " World",
       };
 
       handler.addDelta(blob1);
@@ -37,26 +37,26 @@ describe('EditorChangeHandler', () => {
       const deltas = handler.getCumulativeDeltas();
       expect(deltas).toHaveLength(1);
       expect(deltas[0]).toEqual({
-        type: 'insert',
+        type: "insert",
         pos: 0,
         ln: 0,
-        data: 'Hello World'
+        data: "Hello World",
       });
     });
 
-    test('should not merge inserts on different lines', () => {
+    test("should not merge inserts on different lines", () => {
       const blob1: Blob = {
-        type: 'insert',
+        type: "insert",
         pos: 0,
         ln: 0,
-        data: 'Hello'
+        data: "Hello",
       };
 
       const blob2: Blob = {
-        type: 'insert',
+        type: "insert",
         pos: 0,
         ln: 1,
-        data: 'World'
+        data: "World",
       };
 
       handler.addDelta(blob1);
@@ -66,19 +66,19 @@ describe('EditorChangeHandler', () => {
       expect(deltas).toHaveLength(2);
     });
 
-    test('should not merge non-consecutive inserts', () => {
+    test("should not merge non-consecutive inserts", () => {
       const blob1: Blob = {
-        type: 'insert',
+        type: "insert",
         pos: 0,
         ln: 0,
-        data: 'Hello'
+        data: "Hello",
       };
 
       const blob2: Blob = {
-        type: 'insert',
+        type: "insert",
         pos: 10, // Gap between inserts
         ln: 0,
-        data: 'World'
+        data: "World",
       };
 
       handler.addDelta(blob1);
@@ -88,19 +88,19 @@ describe('EditorChangeHandler', () => {
       expect(deltas).toHaveLength(2);
     });
 
-    test('should merge consecutive deletes at same position (backspace)', () => {
+    test("should merge consecutive deletes at same position (backspace)", () => {
       const blob1: Blob = {
-        type: 'delete',
+        type: "delete",
         pos: 5,
         ln: 0,
-        steps: 2
+        steps: 2,
       };
 
       const blob2: Blob = {
-        type: 'delete',
+        type: "delete",
         pos: 5,
         ln: 0,
-        steps: 3
+        steps: 3,
       };
 
       handler.addDelta(blob1);
@@ -109,26 +109,26 @@ describe('EditorChangeHandler', () => {
       const deltas = handler.getCumulativeDeltas();
       expect(deltas).toHaveLength(1);
       expect(deltas[0]).toEqual({
-        type: 'delete',
+        type: "delete",
         pos: 5,
         ln: 0,
-        steps: 5
+        steps: 5,
       });
     });
 
-    test('should merge consecutive deletes at sequential positions (forward delete)', () => {
+    test("should merge consecutive deletes at sequential positions (forward delete)", () => {
       const blob1: Blob = {
-        type: 'delete',
+        type: "delete",
         pos: 5,
         ln: 0,
-        steps: 2
+        steps: 2,
       };
 
       const blob2: Blob = {
-        type: 'delete',
+        type: "delete",
         pos: 3, // Position adjusted for backspace scenario
         ln: 0,
-        steps: 1
+        steps: 1,
       };
 
       handler.addDelta(blob1);
@@ -137,26 +137,26 @@ describe('EditorChangeHandler', () => {
       const deltas = handler.getCumulativeDeltas();
       expect(deltas).toHaveLength(1);
       expect(deltas[0]).toEqual({
-        type: 'delete',
+        type: "delete",
         pos: 5,
         ln: 0,
-        steps: 3
+        steps: 3,
       });
     });
 
-    test('should not merge different operation types', () => {
+    test("should not merge different operation types", () => {
       const blob1: Blob = {
-        type: 'insert',
+        type: "insert",
         pos: 0,
         ln: 0,
-        data: 'Hello'
+        data: "Hello",
       };
 
       const blob2: Blob = {
-        type: 'delete',
+        type: "delete",
         pos: 5,
         ln: 0,
-        steps: 2
+        steps: 2,
       };
 
       handler.addDelta(blob1);
@@ -167,13 +167,13 @@ describe('EditorChangeHandler', () => {
     });
   });
 
-  describe('Utility methods', () => {
-    test('should clear all deltas', () => {
+  describe("Utility methods", () => {
+    test("should clear all deltas", () => {
       handler.addDelta({
-        type: 'insert',
+        type: "insert",
         pos: 0,
         ln: 0,
-        data: 'test'
+        data: "test",
       });
 
       expect(handler.getDeltaCount()).toBe(1);
@@ -181,19 +181,19 @@ describe('EditorChangeHandler', () => {
       expect(handler.getDeltaCount()).toBe(0);
     });
 
-    test('should get last delta', () => {
+    test("should get last delta", () => {
       const blob1: Blob = {
-        type: 'insert',
+        type: "insert",
         pos: 0,
         ln: 0,
-        data: 'first'
+        data: "first",
       };
 
       const blob2: Blob = {
-        type: 'insert',
+        type: "insert",
         pos: 5,
         ln: 0,
-        data: 'second'
+        data: "second",
       };
 
       handler.addDelta(blob1);
@@ -201,19 +201,19 @@ describe('EditorChangeHandler', () => {
 
       const lastDelta = handler.getLastDelta();
       expect(lastDelta).toEqual({
-        type: 'insert',
+        type: "insert",
         pos: 0,
         ln: 0,
-        data: 'firstsecond'
+        data: "firstsecond",
       });
     });
 
-    test('should return copy of cumulative deltas', () => {
+    test("should return copy of cumulative deltas", () => {
       const blob: Blob = {
-        type: 'insert',
+        type: "insert",
         pos: 0,
         ln: 0,
-        data: 'test'
+        data: "test",
       };
 
       handler.addDelta(blob);

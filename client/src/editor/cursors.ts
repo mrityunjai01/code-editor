@@ -28,6 +28,7 @@ export class CursorManager {
     this.onCursorsChange = onCursorsChange;
     this.initializeStyles();
     this.initializeDecorations();
+    return this;
   }
 
   private initializeDecorations() {
@@ -68,9 +69,7 @@ export class CursorManager {
     return Array.from(this.cursors.values());
   }
 
-  getMaineursor(): Cursor | undefined {
-    return Array.from(this.cursors.values()).find((cursor) => cursor.isMain);
-  }
+  // This manager only handles remote cursors now
 
   updateTypingStatus(id: string, isTyping: boolean) {
     const existing = this.cursors.get(id);
@@ -87,7 +86,7 @@ export class CursorManager {
     const newDecorations: editor.IModelDeltaDecoration[] = Array.from(
       this.cursors.values(),
     )
-      .filter((cursor) => !cursor.isMain) // Don't decorate main cursor
+      // All cursors in this manager are remote cursors
       .map((cursor) => {
         const defaultOptions: editor.IModelDecorationOptions = {
           className: `remote-cursor cursor-${cursor.id}`,
@@ -210,15 +209,41 @@ export const DEFAULT_COLORS = [
   "#F8C471", // Orange
 ];
 
-export const createInitialCursors = (user_name: string): Cursor[] => {
-  return [
-    {
-      id: "main",
-      name: user_name,
+export interface MainCursor {
+  name: string;
+  pos: number;
+  ln: number;
+}
+
+export class MainCursorManager {
+  private cursor: MainCursor;
+  private onCursorChange?: (cursor: MainCursor) => void;
+
+  constructor(name: string, onCursorChange?: (cursor: MainCursor) => void) {
+    this.cursor = {
+      name,
       pos: 0,
       ln: 0,
-      color: "#007ACC",
-      isMain: true,
-    },
-  ];
+    };
+    this.onCursorChange = onCursorChange;
+  }
+
+  updateCursor(pos: number, ln: number) {
+    this.cursor = { ...this.cursor, pos, ln };
+    this.notifyChange();
+  }
+
+  getCursor(): MainCursor {
+    return { ...this.cursor };
+  }
+
+  private notifyChange() {
+    if (this.onCursorChange) {
+      this.onCursorChange(this.getCursor());
+    }
+  }
+}
+
+export const createInitialCursors = (user_name: string): Cursor[] => {
+  return [];
 };

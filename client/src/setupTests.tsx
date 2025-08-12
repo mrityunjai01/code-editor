@@ -1,7 +1,7 @@
-import '@testing-library/jest-dom';
+import "@testing-library/jest-dom";
 
 // Mock Monaco Editor since it requires DOM environment
-jest.mock('monaco-editor', () => ({
+jest.mock("monaco-editor", () => ({
   editor: {
     IStandaloneCodeEditor: {},
     IModelDeltaDecoration: {},
@@ -13,7 +13,7 @@ jest.mock('monaco-editor', () => ({
 }));
 
 // Mock @monaco-editor/react
-jest.mock('@monaco-editor/react', () => ({
+jest.mock("@monaco-editor/react", () => ({
   Editor: ({ onMount, onChange, ...props }: any) => {
     const mockEditor = {
       onDidChangeModelContent: jest.fn(),
@@ -26,14 +26,14 @@ jest.mock('@monaco-editor/react', () => ({
         set: jest.fn(),
       })),
     };
-    
+
     // Simulate onMount being called
     setTimeout(() => {
       if (onMount) {
         onMount(mockEditor, {});
       }
     }, 0);
-    
-    return <div data-testid="monaco-editor" {...props} />
+
+    return <div data-testid="monaco-editor" {...props} />;
   },
 }));

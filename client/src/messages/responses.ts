@@ -3,10 +3,18 @@ export interface ConnectAckResponse {
   client_id: string;
 }
 
-export interface AddClientResponse {
-  type: "addclient";
+export interface ClientInfo {
   client_id: string;
   name: string;
+}
+
+export interface AddClientResponse {
+  type: "addclient";
+  clients: ClientInfo[];
+}
+export interface RemoveClientResponse {
+  type: "removeclient";
+  clients: ClientInfo[];
 }
 
 export interface CursorResponse {
@@ -39,12 +47,13 @@ export interface TextResponse {
   }>;
 }
 
-export type ResponseType = 
-  | ConnectAckResponse 
-  | AddClientResponse 
-  | CursorResponse 
-  | TypingResponse 
-  | InitialDumpResponse 
+export type ResponseType =
+  | ConnectAckResponse
+  | AddClientResponse
+  | RemoveClientResponse
+  | CursorResponse
+  | TypingResponse
+  | InitialDumpResponse
   | TextResponse;
 
 export function validateResponse(message: any): ResponseType | null {
@@ -60,7 +69,14 @@ export function validateResponse(message: any): ResponseType | null {
         }
         break;
       case "addclient":
-        if (typeof message.client_id === "string" && typeof message.name === "string") {
+        if (
+          Array.isArray(message.clients) &&
+          message.clients.every(
+            (client: any) =>
+              typeof client.client_id === "string" &&
+              typeof client.name === "string",
+          )
+        ) {
           return message as AddClientResponse;
         }
         break;
