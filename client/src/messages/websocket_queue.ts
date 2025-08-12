@@ -111,12 +111,6 @@ export const useQueue = (options: QueueOptions) => {
       if (queue_manager_ref.current.length() > threshold_queue) {
         console.log("flushing ");
         queue_manager.flush_queue();
-      } else {
-        console.log(
-          "not enough messages",
-          queue_manager_ref.current.length(),
-          threshold_queue,
-        );
       }
     }, interval_delay);
 

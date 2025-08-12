@@ -57,7 +57,7 @@ function App() {
       client_id,
       setCursors,
     );
-  }, [client_id]);
+  }, [client_id, cursors, setCursors]);
 
   const { sendMessage } = useWebSocket({
     url: "ws://localhost:8000/ws",
@@ -68,6 +68,7 @@ function App() {
     set_is_connected,
     set_client_id,
     editor_ready: change_handler !== null && cursorManagerRef.current !== null,
+    setCursors,
   });
   const queueManagerRef = useRef<QueueManager>(new QueueManager(sendMessage));
 
@@ -80,8 +81,15 @@ function App() {
 
   // Update the connected status whenever isConnected changes
   useEffect(() => {
+    const interval = setInterval(() => {
+      setCursors((prev) => {
+        if (!prev.length) return prev;
+        return [{ ...prev[0], isTyping: !prev[0].isTyping }, ...prev.slice(1)];
+      });
+    }, 1500);
     console.log("updating connected status, clientId = ", client_id);
     update_connected_status(client_id);
+    return () => clearInterval(interval);
   }, [client_id]);
 
   const defaultValue: string = `def main():

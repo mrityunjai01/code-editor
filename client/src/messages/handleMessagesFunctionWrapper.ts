@@ -49,6 +49,7 @@ export const handleMessagesFunctionWrapper = (
                 ln: 0,
                 color: DEFAULT_COLORS[colorIndex],
                 isTyping: false,
+                isMain: false,
               });
             }
           }

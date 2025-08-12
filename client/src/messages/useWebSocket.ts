@@ -9,6 +9,7 @@ interface WebSocketOptions {
   set_is_connected: (arg: boolean) => void;
   set_client_id: (arg: any) => void;
   editor_ready: boolean;
+  setCursors: (cursors: any[]) => void; // Optional, for cursor management
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Event) => void;
@@ -23,10 +24,11 @@ export const useWebSocket = (options: WebSocketOptions) => {
     client_id,
     set_is_connected,
     set_client_id,
+    editor_ready,
+    setCursors,
     onConnect,
     onDisconnect,
     onError,
-    editor_ready,
   } = options;
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -67,7 +69,7 @@ export const useWebSocket = (options: WebSocketOptions) => {
       };
 
       ws.onmessage = (event) => {
-        console.log("received message", event.data);
+        console.log("received message:", event.data);
         try {
           const message = JSON.parse(event.data);
           onMessage(message);
@@ -88,9 +90,6 @@ export const useWebSocket = (options: WebSocketOptions) => {
           );
 
           setReconnectAttempts((prev) => prev + 1);
-          // reconnectTimeoutRef.current = setTimeout(() => {
-          //   // setReconnectTrigger((prev) => !prev); // Trigger reconnect
-          // }, timeout);
         } else {
           console.log("Max reconnection attempts reached");
         }
@@ -127,6 +126,7 @@ export const useWebSocket = (options: WebSocketOptions) => {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
     }
+    console.log("disconnecting");
 
     if (wsRef.current) {
       console.log("closing");
@@ -148,16 +148,16 @@ export const useWebSocket = (options: WebSocketOptions) => {
 
   useEffect(() => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      console.log("change callback", client_id);
       wsRef.current.onmessage = (event) => {
         try {
+          console.log("received message:", event.data);
           const message = JSON.parse(event.data);
 
           onMessage(message);
         } catch (error) {}
       };
     }
-  }, [onMessage, client_id]);
+  }, [onMessage, client_id, setCursors]);
 
   return {
     sendMessage,

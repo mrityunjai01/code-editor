@@ -8,20 +8,19 @@ export interface Cursor {
   color: string;
   isMain: boolean;
   isTyping: boolean;
-  options: editor.IModelDecorationOptions;
+  options?: editor.IModelDecorationOptions;
 }
 
 export class CursorManager {
   private editor: editor.IStandaloneCodeEditor;
   private decorationsCollection: editor.IEditorDecorationsCollection | null =
     null;
-  private decorations: string[] = [];
   private cursors: Map<string, Cursor> = new Map();
   private onCursorsChange?: (cursors: Cursor[]) => void;
 
   constructor(
     editorInstance: editor.IStandaloneCodeEditor,
-    onCursorsChange?: (cursors: Cursor[]) => void,
+    onCursorsChange: (cursors: Cursor[]) => void,
   ) {
     this.editor = editorInstance;
     this.onCursorsChange = onCursorsChange;
