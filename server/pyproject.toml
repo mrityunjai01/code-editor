@@ -1,3 +1,4 @@
 [tool.basedpyright]
 typeCheckingMode = "off"
+extraPaths = ["~/dev_playground/pair_program/", "~/dev_playground/pair_program/server"]
 analysis.extraPaths = ["~/dev_playground/pair_program/", "~/dev_playground/pair_program/server"]

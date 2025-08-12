@@ -6,6 +6,9 @@ from client import Client
 import json
 import asyncio
 
+from messages import responses
+from messages.responses import ResponseType
+
 
 @dataclass
 class DocumentState:
@@ -31,7 +34,7 @@ class GlobalState:
         self.message_queue_count = 0
         self._rooms: Dict[str, RoomState] = {}
         self._lock = threading.RLock()  # For thread safety
-        self.message_queue: Dict[str, list[str]] = defaultdict(list)
+        self.message_queue: Dict[str, list[ResponseType]] = defaultdict(list)
         self.client_by_id: Dict[str, Client] = {}
         self.total_message_count: int = 0
 
@@ -64,6 +67,7 @@ class GlobalState:
             room = self.get_room(room_id)
             if client not in room.clients:
                 room.clients.append(client)
+                print(f"Added client {client.client_id}:{client} to room {room_id}")
 
     def remove_client_from_room(self, room_id: str, client) -> bool:
         """Remove a client from a room. Returns True if room became empty."""
@@ -74,6 +78,9 @@ class GlobalState:
 
             room = self._rooms[room_id]
             if client in room.clients:
+                print(
+                    f"Removing client {client.client_id}:{client} from room {room_id}"
+                )
                 room.clients.remove(client)
 
             is_empty = len(room.clients) == 0
@@ -175,8 +182,9 @@ class GlobalState:
                 "rooms": list(self._rooms.keys()),
             }
 
-    def queue_message(self, message: str, client_id: str):
+    def queue_message(self, message: ResponseType, client_id: str):
         """Queue a message for a specific client"""
+        print(f"queueing message for client {client_id}: {message}")
         with self._lock:
             self.message_queue[client_id].append(message)
             self.total_message_count += 1

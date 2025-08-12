@@ -1,5 +1,6 @@
 import json
 from logger import input_logger
+from config_manager import get_config
 
 async def handle_input_request(websocket, message, state, client):
     """Handle input message requesting document state from a specific message ID"""
@@ -43,8 +44,8 @@ async def handle_initial_dump_request(websocket, message, state, client):
     
     # Set default content if empty
     if not document.content:
-        default_content = "def main():\n    print('Hello, world!')\nif __name__ == '__main__':\n    main()"
-        state.set_document_content(client.room_id, default_content)
+        config = get_config()
+        state.set_document_content(client.room_id, config.room.default_document_content)
         document = state.get_document(client.room_id)
     
     response = {
