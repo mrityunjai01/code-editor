@@ -1,5 +1,4 @@
 import { editor } from "monaco-editor";
-import { faker } from "@faker-js/faker";
 
 export interface Cursor {
   id: string;
@@ -7,9 +6,9 @@ export interface Cursor {
   pos: number;
   ln: number;
   color: string;
-  isMain?: boolean;
-  isTyping?: boolean;
-  options?: editor.IModelDecorationOptions;
+  isMain: boolean;
+  isTyping: boolean;
+  options: editor.IModelDecorationOptions;
 }
 
 export class CursorManager {
