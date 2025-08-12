@@ -17,15 +17,10 @@ export const handleMessagesFunctionWrapper = (
     }
     for (const message of messages) {
       console.log("processing message ", message);
-      if (messages.type === "connect_ack") {
-        console.log("its a connect_ack");
+      if (message.type === "connect_ack") {
         set_is_connected(true);
         set_client_id(messages.client_id);
-      } else if (messages.type === "update") {
-        const deltas = messages.deltas || [];
-        // if (deltas.length > 0 && changeHandler) {
-        //   changeHandler.applyDeltas(deltas);
-        // }
+      } else if (message.type === "update") {
       } else if (message.type === "cursor_update") {
         if (cursorManagerRef.current && message.client_id) {
           cursorManagerRef.current.updateCursor(message.client_id, {
@@ -43,8 +38,6 @@ export const handleMessagesFunctionWrapper = (
       } else if (message.type === "addclient") {
         if (cursorManagerRef.current) {
           const currentCursors = cursorManagerRef.current.getCursors();
-          console.log("Add clients:", message.clients);
-          console.log("except ", client_id);
           for (const [index, client] of message.clients.entries()) {
             if (client.client_id !== client_id) {
               const colorIndex =
