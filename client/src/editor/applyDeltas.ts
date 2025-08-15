@@ -1,11 +1,10 @@
 import { editor } from "monaco-editor";
 
-export interface Blob {
+export interface PreDelta {
   type: "insert" | "delete" | "replace";
   pos: number;
   ln: number;
-  data?: string;
-  steps?: number;
+  data: string;
 }
 
 export interface Delta {

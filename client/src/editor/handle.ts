@@ -1,5 +1,5 @@
 import { editor } from "monaco-editor";
-import { Delta, applyDeltasToEditor } from "./applyDeltas";
+import { Delta, PreDelta, applyDeltasToEditor, rDelta } from "./applyDeltas";
 import { logger } from "../utils/logger";
 
 export class EditorChangeHandler {
@@ -62,12 +62,12 @@ export class EditorChangeHandler {
     });
   }
 
-  addDelta(delta: Delta) {
+  add_change(predelta: PreDelta) {
     const lastDelta = this.cumulativeDeltas[this.cumulativeDeltas.length - 1];
 
     // Try to merge with the last delta if they're compatible
-    if (lastDelta && this.canMergeDeltas(lastDelta, delta)) {
-      const mergedDelta = this.mergeDeltas(lastDelta, delta);
+    if (lastDelta && this.canMergeDeltas(lastDelta, predelta)) {
+      const mergedDelta = this.mergeDeltas(lastDelta, predelta);
       this.cumulativeDeltas[this.cumulativeDeltas.length - 1] = mergedDelta;
       logger.editor.debug("Merged delta:", mergedDelta);
     } else {
@@ -80,11 +80,11 @@ export class EditorChangeHandler {
           lastDelta.data?.length,
         );
       }
-      this.cumulativeDeltas.push(delta);
+      this.cumulativeDeltas.push(predelta_to_delta(predelta));
     }
   }
 
-  private canMergeDeltas(delta: Delta, blob: Blob): boolean {
+  private canMergeDeltas(delta: Delta, predelta: PreDelta): boolean {
     if (delta1.ln !== delta2.ln || delta2.type == "replace") return false;
 
     if (delta1.type === "insert" && delta2.type === "insert") {
@@ -98,7 +98,7 @@ export class EditorChangeHandler {
     return false;
   }
 
-  private mergeDeltas(delta: Delta, blob: Blob): Delta {
+  private mergeDeltas(delta: Delta, predelta: PreDelta): Delta {
     if (delta1.type === "insert" && delta2.type === "insert") {
       return {
         type: "insert",
@@ -156,7 +156,44 @@ export class EditorChangeHandler {
   }
 }
 
-export const handleEditorChange = (value: string | undefined, event: any) => {
-  logger.editor.debug("Editor content changed:", value);
-  logger.editor.debug("Event:", event);
-};
+function predelta_to_rdelta(predelta: PreDelta): rDelta {
+  if (predelta.type === "insert") {
+    const n_lines = (predelta.data || "").split("\n").length;
+    const last_col =
+      n_lines == 0
+        ? predelta.pos + predelta.data.length
+        : predelta.data.length - predelta.data?.lastIndexOf("\n") || 0;
+
+    return {
+      startLine: predelta.ln,
+      startCol: predelta.pos,
+      endLine: predelta.ln,
+      endCol: predelta.pos + (predelta.data?.length || 0),
+      text: predelta.data || "",
+      sourceText: "",
+    };
+  } else if (predelta.type === "delete") {
+    const n_lines = (predelta.data || "").split("\n").length;
+    const last_col =
+      n_lines == 0
+        ? predelta.pos + predelta.data.length
+        : predelta.data.length - predelta.data?.lastIndexOf("\n") || 0;
+    return {
+      startLine: predelta.ln,
+      startCol: predelta.pos,
+      endLine: predelta.ln,
+      endCol: predelta.pos + last_col,
+      text: "",
+      sourceText: predelta.data || "",
+    };
+  } else if (predelta.type === "replace") {
+    return {
+      startLine: predelta.ln,
+      startCol: predelta.pos,
+      endLine: predelta.ln,
+      endCol: predelta.pos + (predelta.data?.length || 0),
+      text: predelta.data || "",
+      sourceText: predelta.data || "",
+    };
+  }
+}

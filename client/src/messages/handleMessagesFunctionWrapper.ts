@@ -91,6 +91,9 @@ export const handleMessagesFunctionWrapper = (
         } else if (message.type === "input_response") {
           // Handle input response with recent deltas
           const deltas = message.deltas || [];
+        } else if (message.type === "text_accepted") {
+          // Handle text accepted response
+          logger.editor.info("Text accepted:", message.count);
         }
       }
     } catch (error) {
