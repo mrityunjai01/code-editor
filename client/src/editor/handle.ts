@@ -1,5 +1,5 @@
 import { editor } from "monaco-editor";
-import { Delta, PreDelta, applyDeltasToEditor, rDelta } from "./applyDeltas";
+import { Delta, PreDelta, applyDeltasToEditor } from "./applyDeltas";
 import { logger } from "../utils/logger";
 
 export class EditorChangeHandler {
@@ -21,20 +21,6 @@ export class EditorChangeHandler {
     }
   }
 
-  setEditor(editorInstance: editor.IStandaloneCodeEditor) {
-    this.editorInstance = editorInstance;
-    if (this.onChangesCallback) {
-      this.setupChangeListener();
-    }
-  }
-
-  setOnChangesCallback(callback: (deltas: Delta[]) => void) {
-    this.onChangesCallback = callback;
-    if (this.editorInstance) {
-      this.setupChangeListener();
-    }
-  }
-
   private setupChangeListener() {
     if (!this.editorInstance || !this.onChangesCallback) return;
 
@@ -42,7 +28,6 @@ export class EditorChangeHandler {
       const deltas: Delta[] = e.changes.map((change) => {
         logger.editor.debug("Change detected:", change);
 
-        // Convert to Delta format (startLine, startCol, endLine, endCol, text)
         return {
           startLine: change.range.startLineNumber,
           startCol: change.range.startColumn,
@@ -52,17 +37,17 @@ export class EditorChangeHandler {
         };
       });
 
-      // Store deltas cumulatively
-      this.addDeltas(deltas);
+      deltas.forEach((delta) => {
+        this.add_change(delta);
+      });
 
-      // Call the callback with the new deltas
       if (this.onChangesCallback) {
         this.onChangesCallback(deltas);
       }
     });
   }
 
-  add_change(predelta: PreDelta) {
+  private add_change(predelta: PreDelta) {
     const lastDelta = this.cumulativeDeltas[this.cumulativeDeltas.length - 1];
 
     // Try to merge with the last delta if they're compatible
@@ -72,19 +57,14 @@ export class EditorChangeHandler {
       logger.editor.debug("Merged delta:", mergedDelta);
     } else {
       if (lastDelta) {
-        logger.editor.debug("cant merge deltas:", lastDelta, delta);
-        logger.editor.debug(
-          "cant merge deltas:",
-          lastDelta.pos,
-          lastDelta.data,
-          lastDelta.data?.length,
-        );
+        logger.editor.debug("cant merge deltas:", lastDelta, predelta);
+        logger.editor.debug("cant merge deltas:", lastDelta, predelta);
       }
       this.cumulativeDeltas.push(predelta_to_delta(predelta));
     }
   }
 
-  private canMergeDeltas(delta: Delta, predelta: PreDelta): boolean {
+  private canMergeDeltas(delta1: Delta, delta2: PreDelta): boolean {
     if (delta1.ln !== delta2.ln || delta2.type == "replace") return false;
 
     if (delta1.type === "insert" && delta2.type === "insert") {
@@ -94,11 +74,10 @@ export class EditorChangeHandler {
     if (delta1.type === "delete" && delta2.type === "delete") {
       return delta1.pos === delta2.pos + (delta1.steps || 0);
     }
-
     return false;
   }
 
-  private mergeDeltas(delta: Delta, predelta: PreDelta): Delta {
+  private mergeDeltas(delta1: Delta, delta2: PreDelta): Delta {
     if (delta1.type === "insert" && delta2.type === "insert") {
       return {
         type: "insert",
@@ -122,41 +101,17 @@ export class EditorChangeHandler {
     return delta2;
   }
 
-  addDeltas(deltas: Delta[]) {
-    deltas.forEach((delta) => {
-      this.addDelta(delta);
-    });
-  }
-
   applyDeltas(deltas: Delta[]) {
     if (!this.editorInstance) {
       logger.editor.error("No editor instance available");
       return;
     }
 
-    this.addDeltas(deltas);
     applyDeltasToEditor(this.editorInstance, deltas);
-  }
-
-  getCumulativeDeltas(): Delta[] {
-    return [...this.cumulativeDeltas];
-  }
-
-  clearDeltas() {
-    this.cumulativeDeltas = [];
-    logger.editor.debug("Cleared all cumulative deltas");
-  }
-
-  getDeltaCount(): number {
-    return this.cumulativeDeltas.length;
-  }
-
-  getLastDelta(): Delta | undefined {
-    return this.cumulativeDeltas[this.cumulativeDeltas.length - 1];
   }
 }
 
-function predelta_to_rdelta(predelta: PreDelta): rDelta {
+function predelta_to_delta(predelta: PreDelta): Delta {
   if (predelta.type === "insert") {
     const n_lines = (predelta.data || "").split("\n").length;
     const last_col =
@@ -170,7 +125,6 @@ function predelta_to_rdelta(predelta: PreDelta): rDelta {
       endLine: predelta.ln,
       endCol: predelta.pos + (predelta.data?.length || 0),
       text: predelta.data || "",
-      sourceText: "",
     };
   } else if (predelta.type === "delete") {
     const n_lines = (predelta.data || "").split("\n").length;
@@ -184,7 +138,6 @@ function predelta_to_rdelta(predelta: PreDelta): rDelta {
       endLine: predelta.ln,
       endCol: predelta.pos + last_col,
       text: "",
-      sourceText: predelta.data || "",
     };
   } else if (predelta.type === "replace") {
     return {
@@ -193,7 +146,15 @@ function predelta_to_rdelta(predelta: PreDelta): rDelta {
       endLine: predelta.ln,
       endCol: predelta.pos + (predelta.data?.length || 0),
       text: predelta.data || "",
-      sourceText: predelta.data || "",
+    };
+  } else {
+    console.error("Unknown predelta type:", predelta.type);
+    return {
+      startLine: 0,
+      startCol: 0,
+      endLine: 0,
+      endCol: 0,
+      text: "",
     };
   }
 }
