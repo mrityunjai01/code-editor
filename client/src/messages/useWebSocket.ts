@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { logger } from "../utils/logger";
+import { InitialDumpMessage } from "./types";
 
 interface WebSocketOptions {
   url: string;
@@ -32,9 +34,10 @@ export const useWebSocket = (options: WebSocketOptions) => {
   } = options;
 
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const maxReconnectAttempts = 5;
+  const [trigger_reconnect, setTriggerReconnect] = useState(false);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const connect = useCallback(() => {
     try {
@@ -43,7 +46,10 @@ export const useWebSocket = (options: WebSocketOptions) => {
 
       ws.onopen = () => {
         setReconnectAttempts(0);
-        console.log("WebSocket connected, reset to ", reconnectAttempts);
+        logger.websocket.info(
+          "WebSocket connected, reset reconnect attempts to",
+          reconnectAttempts,
+        );
 
         // Send connect message
         if (client_id) {
@@ -68,39 +74,24 @@ export const useWebSocket = (options: WebSocketOptions) => {
         onConnect?.();
       };
 
-      ws.onmessage = (event) => {
-        console.log("received message:", event.data);
-        try {
-          const message = JSON.parse(event.data);
-          onMessage(message);
-        } catch (error) {}
-      };
+      ws.onmessage = onMessage;
 
       ws.onclose = () => {
-        console.log("WebSocket disconnected");
+        logger.websocket.info("WebSocket disconnected");
         set_is_connected(false);
         set_client_id(null);
+        setTriggerReconnect((prev) => !prev);
         onDisconnect?.();
 
         // Attempt to reconnect
-        if (reconnectAttempts < maxReconnectAttempts) {
-          const timeout = Math.pow(2, reconnectAttempts) * 1000; // Exponential backoff
-          console.log(
-            `Attempting to reconnect in ${timeout}ms... (attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`,
-          );
-
-          setReconnectAttempts((prev) => prev + 1);
-        } else {
-          console.log("Max reconnection attempts reached");
-        }
       };
 
       ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
+        logger.websocket.error("WebSocket error:", error);
         onError?.(error);
       };
     } catch (error) {
-      console.error("Error creating WebSocket connection:", error);
+      logger.websocket.error("Error creating WebSocket connection:", error);
     }
   }, [
     url,
@@ -115,21 +106,21 @@ export const useWebSocket = (options: WebSocketOptions) => {
 
   const sendMessage = useCallback((message: any) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      console.log("sending message", message);
+      logger.websocket.debug("sending message", message);
       wsRef.current.send(JSON.stringify(message));
     } else {
-      console.warn("WebSocket is not connected. Message not sent:", message);
+      logger.websocket.warn(
+        "WebSocket is not connected. Message not sent:",
+        message,
+      );
     }
   }, []);
 
   const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-    }
-    console.log("disconnecting");
+    logger.websocket.info("disconnecting");
 
     if (wsRef.current) {
-      console.log("closing");
+      logger.websocket.info("closing WebSocket connection");
       wsRef.current.close();
       wsRef.current = null;
     }
@@ -139,25 +130,33 @@ export const useWebSocket = (options: WebSocketOptions) => {
   }, []);
 
   useEffect(() => {
-    if (editor_ready) connect();
-
-    return () => {
-      disconnect();
-    };
-  }, [editor_ready]);
+    if (editor_ready) {
+      if (!client_id) {
+        if (reconnectAttempts < maxReconnectAttempts) {
+          setReconnectAttempts((prev) => prev + 1);
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connect();
+          }, 1000);
+          return () => {
+            if (reconnectTimeoutRef.current) {
+              clearTimeout(reconnectTimeoutRef.current);
+            }
+          };
+        }
+      } else {
+        setReconnectAttempts(0);
+        return () => {
+          disconnect();
+        };
+      }
+    }
+  }, [editor_ready, client_id, trigger_reconnect]);
 
   useEffect(() => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.onmessage = (event) => {
-        try {
-          console.log("received message:", event.data);
-          const message = JSON.parse(event.data);
-
-          onMessage(message);
-        } catch (error) {}
-      };
+      wsRef.current.onmessage = onMessage;
     }
-  }, [onMessage, client_id, setCursors]);
+  }, [onMessage, client_id, setCursors, room_id]);
 
   return {
     sendMessage,

@@ -5,7 +5,7 @@ export interface Cursor {
   name: string;
   pos: number;
   ln: number;
-  color: string;
+  color_idx: number;
   isMain: boolean;
   isTyping: boolean;
   options?: editor.IModelDecorationOptions;
@@ -87,12 +87,14 @@ export class CursorManager {
       // All cursors in this manager are remote cursors
       .map((cursor) => {
         const defaultOptions: editor.IModelDecorationOptions = {
-          className: `remote-cursor cursor-${cursor.id}`,
-          beforeContentClassName: "remote-cursor-line",
+          className: `remote-cursor cursor-${cursor.id} `,
+          beforeContentClassName: `remote-cursor-line cursor-color-${cursor.color_idx}`,
           stickiness: 1, // NeverGrowsWhenTypingAtEdges
-          hoverMessage: {
-            value: `**${cursor.name}**${cursor.isTyping ? " (typing...)" : ""}\nLine: ${cursor.ln + 1}, Column: ${cursor.pos + 1}`,
-          },
+          hoverMessage: [
+            {
+              value: `**${cursor.name}**${cursor.isTyping ? " (typing...)" : ""}\nLine: ${cursor.ln + 1}, Column: ${cursor.pos + 1}`,
+            },
+          ],
         };
 
         return {
@@ -109,7 +111,6 @@ export class CursorManager {
       });
 
     this.decorationsCollection.set(newDecorations);
-    this.updateCursorStyles();
   }
 
   private notifyChange() {
@@ -127,34 +128,15 @@ export class CursorManager {
 
     let css = `
       /* Base cursor styles */
-      .remote-cursor, .user-cursor {
-        position: relative;
-      }
       
       .remote-cursor-line::before {
         content: '';
         position: absolute;
-        width: 2px;
+        width: 1px;
         height: 1.2em;
-        background-color: var(--cursor-color, #007ACC);
         animation: cursor-blink 1s infinite;
         z-index: 1000;
         border-radius: 1px;
-      }
-      
-      .remote-cursor-after {
-        position: relative;
-      }
-      
-      .remote-cursor-glyph {
-        background-color: var(--cursor-color, #007ACC);
-        width: 4px;
-        border-radius: 2px;
-      }
-      
-      .remote-cursor-inline {
-        background-color: var(--cursor-color, #007ACC);
-        opacity: 0.2;
       }
       
       @keyframes cursor-blink {
@@ -167,29 +149,13 @@ export class CursorManager {
     DEFAULT_COLORS.forEach((color, index) => {
       css += `
         .cursor-color-${index}::before {
-          --cursor-color: ${color};
-        }
-        .cursor-${index} {
-          --cursor-color: ${color};
+            background-color: ${color};
         }
       `;
     });
 
     styleSheet.innerHTML = css;
     document.head.appendChild(styleSheet);
-  }
-
-  private updateCursorStyles() {
-    // Update CSS custom properties for each cursor
-    this.cursors.forEach((cursor) => {
-      const cursorElements = document.querySelectorAll(`.cursor-${cursor.id}`);
-      cursorElements.forEach((element) => {
-        (element as HTMLElement).style.setProperty(
-          "--cursor-color",
-          cursor.color,
-        );
-      });
-    });
   }
 }
 

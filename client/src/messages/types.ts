@@ -1,3 +1,5 @@
+import { Delta } from "../editor/applyDeltas";
+
 export interface ConnectMessage {
   type: "connect";
   room_id: string;
@@ -29,12 +31,21 @@ export interface InitialDumpMessage {
   client_id: string;
 }
 
+export interface TextUpdateMessage {
+  type: "update";
+  deltas: Delta[];
+  last_msg_id: number;
+  client_id: string;
+  room_id: string;
+}
+
 export type MessageType =
   | ConnectMessage
   | TextMessage
   | CursorMessage
   | TypingMessage
-  | InitialDumpMessage;
+  | InitialDumpMessage
+  | TextUpdateMessage;
 
 export function validateMessage(message: any): MessageType | null {
   if (!message || typeof message !== "object" || !message.type) {
@@ -70,6 +81,14 @@ export function validateMessage(message: any): MessageType | null {
           typeof message.client_id === "string"
         ) {
           return message as TypingMessage;
+        }
+        break;
+      case "initial_dump_request":
+        if (
+          typeof message.room_id === "string" &&
+          typeof message.client_id === "string"
+        ) {
+          return message as InitialDumpMessage;
         }
         break;
     }

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Console Removal Test</title>
+</head>
+<body>
+    <h1>Console Removal Test</h1>
+    <p>Open the browser console to test console removal in production build.</p>
+    <button onclick="testConsole()">Test Console Logs</button>
+    
+    <script>
+        // Direct console statements (should be removed in production)
+        console.log("This should be removed in production");
+        console.warn("This warning should be removed in production");
+        console.error("This error should be removed in production");
+        console.info("This info should be removed in production");
+        console.debug("This debug should be removed in production");
+        
+        function testConsole() {
+            console.log("Button clicked - this should be removed in production");
+            alert("Check console for output");
+        }
+        
+        // Test if console methods still exist (they should be replaced with no-ops)
+        if (typeof console.log === 'function') {
+            console.log("Console.log is still a function");
+        } else {
+            alert("Console.log has been removed/replaced");
+        }
+    </script>
+</body>
+</html>

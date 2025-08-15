@@ -6,9 +6,11 @@ import React, {
   useMemo,
   MutableRefObject,
 } from "react";
+import { useParams } from "react-router-dom";
 import "./App.css";
 import { useWebSocket } from "./messages/useWebSocket";
 import { faker } from "@faker-js/faker";
+import { logger } from "./utils/logger";
 
 import { Editor } from "@monaco-editor/react";
 import { Delta } from "./editor/applyDeltas";
@@ -26,12 +28,18 @@ import { EditorChangeHandler } from "./editor/handle";
 import { useQueue, QueueManager } from "./messages/websocket_queue";
 import { handleMessagesFunctionWrapper } from "./messages/handleMessagesFunctionWrapper";
 import { CursorList } from "./components/CursorComponent";
+import { InitialDumpMessage } from "./messages/types";
+import { websocket_config } from "./messages/queue_config";
 
 function App() {
-  const room_id = "room-123"; // For demo purposes
+  const { roomId } = useParams<{ roomId: string }>();
+  const [room_id, set_room_id] = useState(roomId || "#r-0"); // Use URL param or default
+  const [pot_room_id, set_pot_room_id] = useState(roomId || "#r-0");
   const user_name_ref: MutableRefObject<string> = useRef(
     faker.commerce.productName(),
   );
+  const [change_room_button_disabled, set_change_room_button_disabled] =
+    useState(true);
   const [cursors, setCursors] = useState<Cursor[]>(
     createInitialCursors(user_name_ref.current),
   );
@@ -46,7 +54,12 @@ function App() {
     useState<EditorChangeHandler | null>(null);
   const cursorManagerRef = useRef<CursorManager | null>(null);
   const mainCursorManagerRef = useRef<MainCursorManager | null>(null);
-  const [editorValue, set_editor_value] = useState();
+
+  const defaultValue: string = `def main():
+    print('Hello, world!')
+if __name__ == '__main__':
+    main()`;
+  const [editor_value, set_editor_value] = useState(defaultValue);
 
   const response_handler = useMemo(() => {
     return handleMessagesFunctionWrapper(
@@ -70,40 +83,56 @@ function App() {
     editor_ready: change_handler !== null && cursorManagerRef.current !== null,
     setCursors,
   });
-  const queueManagerRef = useRef<QueueManager>(new QueueManager(sendMessage));
+  const queue_manager_ref = useRef<QueueManager>(new QueueManager(sendMessage));
 
-  const { enqueue, update_connected_status } = useQueue({
-    max_size: 15,
-    threshold_queue: 1,
-    interval_delay: 1000,
-    queue_manager: queueManagerRef.current,
-  });
+  const { enqueue_pos, enqueue_text, update_connected_status } = useQueue(
+    websocket_config(queue_manager_ref.current),
+  );
 
   // Update the connected status whenever isConnected changes
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCursors((prev) => {
-        if (!prev.length) return prev;
-        return [{ ...prev[0], isTyping: !prev[0].isTyping }, ...prev.slice(1)];
-      });
-    }, 1500);
-    console.log("updating connected status, clientId = ", client_id);
-    update_connected_status(client_id);
-    return () => clearInterval(interval);
+    logger.app.info("updating connected status, clientId = ", client_id);
+    update_connected_status(client_id, room_id);
+    if (client_id) {
+      const initial_dump_request: InitialDumpMessage = {
+        type: "initial_dump_request",
+        room_id: room_id,
+        client_id: client_id,
+      };
+      sendMessage(initial_dump_request);
+    }
   }, [client_id]);
 
-  const defaultValue: string = `def main():
-    print('Hello, world!')
-if __name__ == '__main__':
-    main()`;
+  useEffect(() => {
+    set_client_id(null);
+    if (
+      cursorManagerRef.current !== null &&
+      change_handler !== null &&
+      editorInstance.current
+    ) {
+      setCursors([]);
+      set_editor_value("");
+      cursorManagerRef.current = new CursorManager(
+        editorInstance.current,
+        setCursors,
+      );
+    }
+  }, [room_id]);
 
-  let editorInstance: editor.IStandaloneCodeEditor;
+  useEffect(() => {
+    if (roomId && roomId.startsWith("#r-")) {
+      set_room_id(roomId);
+      set_pot_room_id(roomId);
+    }
+  }, [roomId]);
+
+  let editorInstance = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   // Function to send updates to server
   const sendUpdateToServer = (deltas: Delta[]) => {
     if (deltas.length === 0) return;
 
-    console.log("Sending deltas to server:", deltas);
+    logger.editor.debug("Sending deltas to server:", deltas);
     // Send deltas to WebSocket server
     if (isConnected) {
       sendMessage({
@@ -116,14 +145,14 @@ if __name__ == '__main__':
     editor: editor.IStandaloneCodeEditor,
     _monaco: typeof import("monaco-editor"),
   ) {
-    editorInstance = editor;
+    editorInstance.current = editor;
 
     // Initialize change handler with callback
     set_change_handler(new EditorChangeHandler(editor, sendUpdateToServer));
     // Initialize cursor manager for remote cursors only
 
     const manager = new CursorManager(editor, setCursors);
-    console.log("CursorManager initialized:", manager);
+    logger.cursor.info("CursorManager initialized:", manager);
     cursorManagerRef.current = manager;
 
     // Initialize main cursor manager
@@ -131,7 +160,7 @@ if __name__ == '__main__':
       user_name_ref.current,
       setMainCursor,
     );
-    console.log("MainCursorManager initialized:", mainManager);
+    logger.cursor.info("MainCursorManager initialized:", mainManager);
     mainCursorManagerRef.current = mainManager;
 
     // Track main cursor position and send to server
@@ -141,7 +170,7 @@ if __name__ == '__main__':
         e.position.lineNumber - 1,
       );
       // Enqueue cursor position update
-      enqueue({
+      enqueue_pos({
         type: "cursor",
         cursor_pos: e.position.column - 1,
         cursor_ln: e.position.lineNumber - 1,
@@ -156,26 +185,24 @@ if __name__ == '__main__':
       if (!isTyping) {
         isTyping = true;
         // Enqueue typing start
-        enqueue({
+        enqueue_pos({
           type: "typing",
           typing: true,
         });
       }
 
-      // Clear existing timer
       if (typingTimer) {
         clearTimeout(typingTimer);
       }
 
-      // Set timer to stop typing indicator after 2 seconds of inactivity
       typingTimer = setTimeout(() => {
         isTyping = false;
         // Enqueue typing stop
-        enqueue({
+        enqueue_pos({
           type: "typing",
           typing: false,
         });
-      }, 2000);
+      }, 5000);
     });
 
     // Request initial document content when connected
@@ -209,18 +236,44 @@ if __name__ == '__main__':
             >
               {isConnected ? "🟢 Connected" : "🔴 Disconnected"}
             </span>
-            <span style={{ marginLeft: "10px" }}>Room: {room_id}</span>
-            <span style={{ marginLeft: "10px" }}>
-              {isConnected
-                ? "✏️ Ready to edit"
-                : "⏳ Waiting for connection..."}
-            </span>
+            <span style={{ marginLeft: "10px" }}>Room: </span>
+            <input
+              type="text"
+              style={{
+                borderRadius: "8px",
+                border: "1px solid #ccc",
+                padding: "4px 12px",
+                marginRight: "10px",
+              }}
+              placeholder="Enter room name"
+              value={pot_room_id}
+              onChange={(e) => {
+                set_pot_room_id(e.target.value);
+                set_change_room_button_disabled(false);
+              }}
+            />
+            <button
+              style={{
+                border: "1px",
+                borderRadius: "8px",
+                padding: "4px 12px",
+                marginInline: "10px",
+              }}
+              disabled={change_room_button_disabled}
+              onClick={() => {
+                set_change_room_button_disabled(true);
+                set_room_id(pot_room_id);
+              }}
+            >
+              Connect
+            </button>
+            {isConnected ? "✏️ Ready to edit" : "⏳ Waiting for connection..."}
           </div>
         </div>
         <Editor
           height="calc(100vh - 60px)"
           defaultLanguage="python"
-          value={editorValue}
+          value={editor_value}
           defaultValue={defaultValue}
           onMount={handleEditorMount}
           theme="vs-dark"

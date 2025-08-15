@@ -31,7 +31,9 @@ describe("CursorManager", () => {
         name: "Test User",
         pos: 5,
         ln: 1,
-        color: "#FF0000",
+        color_idx: 0,
+        isMain: false,
+        isTyping: false,
       };
 
       cursorManager.addCursor(cursor);
@@ -48,7 +50,9 @@ describe("CursorManager", () => {
         name: "Test User",
         pos: 5,
         ln: 1,
-        color: "#FF0000",
+        color_idx: 0,
+        isMain: false,
+        isTyping: false,
       };
 
       cursorManager.addCursor(cursor);
@@ -60,7 +64,9 @@ describe("CursorManager", () => {
         name: "Test User",
         pos: 10,
         ln: 2,
-        color: "#FF0000",
+        color_idx: 0,
+        isMain: false,
+        isTyping: false,
       });
     });
 
@@ -70,7 +76,9 @@ describe("CursorManager", () => {
         name: "Test User",
         pos: 5,
         ln: 1,
-        color: "#FF0000",
+        color_idx: 0,
+        isMain: false,
+        isTyping: false,
       };
 
       cursorManager.addCursor(cursor);
@@ -88,14 +96,18 @@ describe("CursorManager", () => {
           name: "User 1",
           pos: 0,
           ln: 0,
-          color: "#FF0000",
+          color_idx: 0,
+          isMain: false,
+          isTyping: false,
         },
         {
           id: "cursor2",
           name: "User 2",
           pos: 5,
           ln: 1,
-          color: "#00FF00",
+          color_idx: 0,
+          isMain: false,
+          isTyping: false,
         },
       ];
 
@@ -104,30 +116,6 @@ describe("CursorManager", () => {
       const retrievedCursors = cursorManager.getCursors();
       expect(retrievedCursors).toHaveLength(2);
       expect(retrievedCursors).toEqual(expect.arrayContaining(cursors));
-    });
-
-    test("should get main cursor", () => {
-      const mainCursor: Cursor = {
-        id: "main",
-        name: "Main User",
-        pos: 0,
-        ln: 0,
-        color: "#0000FF",
-        isMain: true,
-      };
-
-      const regularCursor: Cursor = {
-        id: "regular",
-        name: "Regular User",
-        pos: 5,
-        ln: 1,
-        color: "#FF0000",
-      };
-
-      cursorManager.setCursors([mainCursor, regularCursor]);
-
-      const mainCursorResult = cursorManager.getMainCursor();
-      expect(mainCursorResult).toEqual(mainCursor);
     });
 
     test("should not call onChange callback if cursor update fails", () => {
@@ -143,7 +131,7 @@ describe("CursorManager", () => {
 
 describe("createInitialCursors", () => {
   test("should create initial cursors with main cursor and remote cursors", () => {
-    const cursors = createInitialCursors();
+    const cursors = createInitialCursors("");
 
     expect(cursors).toHaveLength(2); // 1 main + 1 remote (as per current implementation)
 
@@ -159,11 +147,11 @@ describe("createInitialCursors", () => {
   });
 
   test("should assign different colors to remote cursors", () => {
-    const cursors = createInitialCursors();
+    const cursors = createInitialCursors("");
     const remoteCursors = cursors.filter((c) => !c.isMain);
 
     remoteCursors.forEach((cursor, index) => {
-      expect(cursor.color).toBe(DEFAULT_COLORS[index]);
+      expect(cursor.color_idx).toBe(index);
     });
   });
 });

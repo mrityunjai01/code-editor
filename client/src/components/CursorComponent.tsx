@@ -1,5 +1,6 @@
 import React from "react";
 import { Cursor, MainCursor } from "../editor/cursors";
+import { DEFAULT_COLORS } from "../editor/cursors";
 
 interface CursorItemProps {
   cursor: Cursor;
@@ -16,7 +17,7 @@ const CursorItem: React.FC<CursorItemProps> = ({ cursor }) => (
       borderRadius: "4px",
       boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
       border: cursor.isTyping
-        ? `2px solid ${cursor.color}`
+        ? `2px solid ${DEFAULT_COLORS[cursor.color_idx]}`
         : "2px solid transparent",
     }}
   >
@@ -24,7 +25,7 @@ const CursorItem: React.FC<CursorItemProps> = ({ cursor }) => (
       style={{
         width: "12px",
         height: "12px",
-        backgroundColor: cursor.color,
+        backgroundColor: DEFAULT_COLORS[cursor.color_idx],
         marginRight: "8px",
         borderRadius: "2px",
       }}
@@ -45,7 +46,7 @@ const CursorItem: React.FC<CursorItemProps> = ({ cursor }) => (
           <span
             style={{
               fontSize: "12px",
-              color: cursor.color,
+              color: DEFAULT_COLORS[cursor.color_idx],
               animation: "pulse 1.5s infinite",
             }}
           >
@@ -59,7 +60,7 @@ const CursorItem: React.FC<CursorItemProps> = ({ cursor }) => (
           <span
             style={{
               marginLeft: "6px",
-              color: cursor.color,
+              color: DEFAULT_COLORS[cursor.color_idx],
               fontStyle: "italic",
             }}
           >
@@ -135,22 +136,3 @@ export const CursorList: React.FC<CursorListProps> = ({
     ))}
   </div>
 );
-
-interface WithCursorsProps {
-  cursors: Cursor[];
-  children: React.ReactNode;
-}
-
-export const withCursors = <P extends object>(
-  WrappedComponent: React.ComponentType<P>,
-) => {
-  return (props: P & WithCursorsProps) => {
-    const { cursors, children, ...rest } = props;
-    return (
-      <div style={{ height: "100vh", display: "flex" }}>
-        <CursorList cursors={cursors} />
-        <WrappedComponent {...(rest as P)}>{children}</WrappedComponent>
-      </div>
-    );
-  };
-};

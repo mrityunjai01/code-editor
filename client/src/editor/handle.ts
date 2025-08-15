@@ -1,5 +1,6 @@
 import { editor } from "monaco-editor";
 import { Delta, applyDeltasToEditor } from "./applyDeltas";
+import { logger } from "../utils/logger";
 
 export class EditorChangeHandler {
   private cumulativeDeltas: Delta[] = [];
@@ -39,7 +40,7 @@ export class EditorChangeHandler {
 
     this.editorInstance.onDidChangeModelContent((e) => {
       const deltas: Delta[] = e.changes.map((change) => {
-        console.log("Change detected:", change);
+        logger.editor.debug("Change detected:", change);
 
         // Convert to Delta format (startLine, startCol, endLine, endCol, text)
         return {
@@ -68,11 +69,11 @@ export class EditorChangeHandler {
     if (lastDelta && this.canMergeDeltas(lastDelta, delta)) {
       const mergedDelta = this.mergeDeltas(lastDelta, delta);
       this.cumulativeDeltas[this.cumulativeDeltas.length - 1] = mergedDelta;
-      console.log("Merged delta:", mergedDelta);
+      logger.editor.debug("Merged delta:", mergedDelta);
     } else {
       if (lastDelta) {
-        console.log("cant merge deltas:", lastDelta, delta);
-        console.log(
+        logger.editor.debug("cant merge deltas:", lastDelta, delta);
+        logger.editor.debug(
           "cant merge deltas:",
           lastDelta.pos,
           lastDelta.data,
@@ -83,7 +84,7 @@ export class EditorChangeHandler {
     }
   }
 
-  private canMergeDeltas(delta1: Delta, delta2: Delta): boolean {
+  private canMergeDeltas(delta: Delta, blob: Blob): boolean {
     if (delta1.ln !== delta2.ln || delta2.type == "replace") return false;
 
     if (delta1.type === "insert" && delta2.type === "insert") {
@@ -97,7 +98,7 @@ export class EditorChangeHandler {
     return false;
   }
 
-  private mergeDeltas(delta1: Delta, delta2: Delta): Delta {
+  private mergeDeltas(delta: Delta, blob: Blob): Delta {
     if (delta1.type === "insert" && delta2.type === "insert") {
       return {
         type: "insert",
@@ -117,7 +118,7 @@ export class EditorChangeHandler {
     }
 
     // Fallback - should not reach here if canMergeDeltas works correctly
-    console.warn("Merging incompatible deltas:", delta1, delta2);
+    logger.editor.warn("Merging incompatible deltas:", delta1, delta2);
     return delta2;
   }
 
@@ -129,7 +130,7 @@ export class EditorChangeHandler {
 
   applyDeltas(deltas: Delta[]) {
     if (!this.editorInstance) {
-      console.error("No editor instance available");
+      logger.editor.error("No editor instance available");
       return;
     }
 
@@ -143,7 +144,7 @@ export class EditorChangeHandler {
 
   clearDeltas() {
     this.cumulativeDeltas = [];
-    console.log("Cleared all cumulative deltas");
+    logger.editor.debug("Cleared all cumulative deltas");
   }
 
   getDeltaCount(): number {
@@ -156,6 +157,6 @@ export class EditorChangeHandler {
 }
 
 export const handleEditorChange = (value: string | undefined, event: any) => {
-  console.log("Editor content changed:", value);
-  console.log("Event:", event);
+  logger.editor.debug("Editor content changed:", value);
+  logger.editor.debug("Event:", event);
 };

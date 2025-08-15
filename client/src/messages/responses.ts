@@ -1,3 +1,5 @@
+import { Delta } from "../editor/applyDeltas";
+
 export interface ConnectAckResponse {
   type: "connect_ack";
   client_id: string;
@@ -39,12 +41,11 @@ export interface InitialDumpResponse {
 
 export interface TextResponse {
   type: "update";
-  deltas: Array<{
-    type: string;
-    pos: number;
-    ln: number;
-    data: string;
-  }>;
+  deltas: Delta[];
+}
+export interface TextAcceptedResponse {
+  type: "text_accepted";
+  count: number;
 }
 
 export type ResponseType =
@@ -54,7 +55,8 @@ export type ResponseType =
   | CursorResponse
   | TypingResponse
   | InitialDumpResponse
-  | TextResponse;
+  | TextResponse
+  | TextAcceptedResponse;
 
 export function validateResponse(message: any): ResponseType | null {
   if (!message || typeof message !== "object" || !message.type) {
