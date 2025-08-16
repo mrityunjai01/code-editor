@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { MessageType } from "./types";
 import { logger } from "../utils/logger";
-import { rDelta } from "../editor/applyDeltas";
+import { Delta } from "../editor/applyDeltas";
 
 export interface QueueOptions {
   threshold_queue: number;
@@ -22,20 +22,20 @@ type QueueEvent =
     };
 
 export class QueueManager {
-  private text_updates: rDelta[] = [];
-  private last_text_update_msg_id = 0;
-  private last_text_update_msg_id_sent = -1;
+  private text_updates: Delta[] = [];
+  private last_text_update_msg_id = -1;
+  private last_text_update_msg_id_sent = -1000000;
   private initial_typing = false;
   private initial_cursor_ln = 0;
   private initial_cursor_pos = 0;
   private typing = false;
   private cursor_ln = 0;
   private cursor_pos = 0;
-  private send_messages: (messages: MessageType[]) => void;
+  private send_messages: (message: MessageType) => void;
   private client_id: string | null = null;
   private room_id: string | null = null;
 
-  constructor(callback: (message: MessageType[]) => void) {
+  constructor(callback: (message: MessageType) => void) {
     this.send_messages = callback;
   }
 
@@ -54,7 +54,16 @@ export class QueueManager {
     }
   }
 
-  enqueue_text(event: QueueEvent) {}
+  enqueue_text(text_updates: Delta[]) {
+    for (const text_update of text_updates) {
+      console.debug("enqueueing text update", text_update);
+      this.text_updates.push(text_update);
+    }
+  }
+
+  increment_last_text_update_msg_id(count: number) {
+    this.last_text_update_msg_id += count;
+  }
 
   accept_text_updates(count: number) {
     this.text_updates = this.text_updates.slice(count);
@@ -65,9 +74,16 @@ export class QueueManager {
     return this.text_updates.length;
   }
 
+  get_prefix_updates(count: number) {
+    return this.text_updates.slice(0, count);
+  }
+  get_suffix_updates(count: number) {
+    return this.text_updates.slice(count);
+  }
+
   flush_text_updates() {
-    if (!this.client_id) {
-      logger.queue.warn("cant flush because no client id");
+    if (!this.client_id || !this.room_id) {
+      logger.queue.warn("cant flush because no client id or room id");
       return;
     }
     if (this.last_text_update_msg_id_sent >= this.last_text_update_msg_id) {
@@ -80,14 +96,15 @@ export class QueueManager {
       return;
     }
     if (this.text_updates.length > 0) {
+      console.log("finally sneding  text updates", this.text_updates);
       const messages: MessageType = {
         type: "update",
         deltas: this.text_updates,
-        last_msg_id: Date.now(),
+        last_msg_id: this.last_text_update_msg_id,
         client_id: this.client_id,
         room_id: this.room_id, // Replace with actual room ID if needed
       };
-      this.send_messages([messages]);
+      this.send_messages(messages);
     }
     this.last_text_update_msg_id_sent = this.last_text_update_msg_id;
   }
@@ -116,9 +133,9 @@ export class QueueManager {
         client_id: this.client_id,
       });
     }
-    if (messages.length) {
-      this.send_messages(messages);
-    }
+    messages.forEach((message) => {
+      this.send_messages(message);
+    });
     this.initial_typing = this.typing;
     this.initial_cursor_ln = this.cursor_ln;
     this.initial_cursor_pos = this.cursor_pos;
@@ -145,7 +162,7 @@ export const useQueue = (options: QueueOptions) => {
     queue_manager_ref.current.enqueue_pos(message);
   }, []);
 
-  const enqueue_text = useCallback((message: QueueEvent) => {
+  const enqueue_text = useCallback((message: Delta[]) => {
     queue_manager_ref.current.enqueue_text(message);
     if (queue_manager_ref.current.length() >= threshold_queue) {
       setQueueTrigger((prev) => !prev); // Trigger the effect to empty the queue
@@ -163,17 +180,13 @@ export const useQueue = (options: QueueOptions) => {
   useEffect(() => {
     const interval = setInterval(() => {
       queue_manager_ref.current.flush_pos_updates();
-    });
+    }, pos_update_interval);
 
     return () => clearInterval(interval);
   }, [pos_update_interval]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      queue_manager_ref.current.flush_text_updates();
-    });
-
-    return () => clearInterval(interval);
+    queue_manager_ref.current.flush_text_updates();
   }, [queueTrigger]);
 
   useEffect(() => {

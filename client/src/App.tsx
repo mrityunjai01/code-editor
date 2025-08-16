@@ -1,9 +1,8 @@
-import React, {
+import {
   useState,
   useEffect,
   useRef,
   useCallback,
-  useMemo,
   MutableRefObject,
 } from "react";
 import { useParams } from "react-router-dom";
@@ -13,10 +12,9 @@ import { faker } from "@faker-js/faker";
 import { logger } from "./utils/logger";
 
 import { Editor } from "@monaco-editor/react";
-import { Delta } from "./editor/applyDeltas";
-import { handleEditorChange } from "./editor/handle";
+
 import type { editor } from "monaco-editor";
-import { applyDeltasToEditor } from "./editor/applyDeltas";
+
 import {
   CursorManager,
   Cursor,
@@ -28,13 +26,14 @@ import { EditorChangeHandler } from "./editor/handle";
 import { useQueue, QueueManager } from "./messages/websocket_queue";
 import { handleMessagesFunctionWrapper } from "./messages/handleMessagesFunctionWrapper";
 import { CursorList } from "./components/CursorComponent";
-import { InitialDumpMessage } from "./messages/types";
+import { InitialDumpMessage, MessageType } from "./messages/types";
 import { websocket_config } from "./messages/queue_config";
 
 function App() {
   const { roomId } = useParams<{ roomId: string }>();
-  const [room_id, set_room_id] = useState(roomId || "#r-0"); // Use URL param or default
-  const [pot_room_id, set_pot_room_id] = useState(roomId || "#r-0");
+  const [room_id, set_room_id] = useState(roomId || "r0"); // Use URL param or default
+  const [pot_room_id, set_pot_room_id] = useState(roomId || "r0");
+  const [force_read_only, set_force_read_only] = useState(false);
   const user_name_ref: MutableRefObject<string> = useRef(
     faker.commerce.productName(),
   );
@@ -50,8 +49,8 @@ function App() {
   });
   const [isConnected, set_is_connected] = useState(false);
   const [client_id, set_client_id] = useState(null);
-  const [change_handler, set_change_handler] =
-    useState<EditorChangeHandler | null>(null);
+  const [attempt_connect, set_attempt_connect] = useState(false);
+  const change_handler_ref = useRef<EditorChangeHandler | null>(null);
   const cursorManagerRef = useRef<CursorManager | null>(null);
   const mainCursorManagerRef = useRef<MainCursorManager | null>(null);
 
@@ -60,31 +59,69 @@ function App() {
 if __name__ == '__main__':
     main()`;
   const [editor_value, set_editor_value] = useState(defaultValue);
-
-  const response_handler = useMemo(() => {
-    return handleMessagesFunctionWrapper(
-      set_is_connected,
-      set_client_id,
-      set_editor_value,
-      cursorManagerRef,
-      client_id,
-      setCursors,
-    );
-  }, [client_id, cursors, setCursors]);
-
-  const { sendMessage } = useWebSocket({
+  const { wsRef } = useWebSocket({
     url: "ws://localhost:8000/ws",
-    onMessage: response_handler,
     room_id,
     user_name: user_name_ref.current,
     client_id,
     set_is_connected,
     set_client_id,
-    editor_ready: change_handler !== null && cursorManagerRef.current !== null,
+    editor_ready:
+      change_handler_ref.current !== null && cursorManagerRef.current !== null,
     setCursors,
+    set_attempt_connect,
   });
-  const queue_manager_ref = useRef<QueueManager>(new QueueManager(sendMessage));
 
+  useEffect(() => {
+    console.log("WebSocket reference updated:", wsRef.current);
+    if (wsRef.current) {
+      console.log("Setting up WebSocket message handler");
+      wsRef.current.onmessage = handleMessagesFunctionWrapper(
+        set_is_connected,
+        set_client_id,
+        set_editor_value,
+        cursorManagerRef,
+        client_id,
+        setCursors,
+        set_force_read_only,
+
+        change_handler_ref,
+        queue_manager_ref,
+      );
+    }
+  }, [client_id, cursors, setCursors, attempt_connect]);
+
+  const queue_manager_ref = useRef<QueueManager>(
+    new QueueManager((message: MessageType) => {
+      console.log("Queue manager sending message:", message);
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        if (message.type === "update") {
+          logger.websocket.debug("sending message", message);
+        }
+
+        wsRef.current.send(JSON.stringify(message));
+      } else {
+        logger.websocket.warn(
+          "WebSocket is not connected. Message not sent:",
+          message,
+        );
+      }
+    }),
+  );
+  const sendMessage = useCallback(
+    (message: any) => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        logger.websocket.debug("sending message", message);
+        wsRef.current.send(JSON.stringify(message));
+      } else {
+        logger.websocket.warn(
+          "WebSocket is not connected. Message not sent:",
+          message,
+        );
+      }
+    },
+    [client_id, attempt_connect],
+  );
   const { enqueue_pos, enqueue_text, update_connected_status } = useQueue(
     websocket_config(queue_manager_ref.current),
   );
@@ -100,6 +137,14 @@ if __name__ == '__main__':
         client_id: client_id,
       };
       sendMessage(initial_dump_request);
+      const interval = setInterval(() => {
+        if (change_handler_ref.current && editorInstance.current) {
+          change_handler_ref.current.change_handler_flush();
+        }
+      }, 4000);
+      return () => {
+        clearInterval(interval);
+      };
     }
   }, [client_id]);
 
@@ -107,7 +152,7 @@ if __name__ == '__main__':
     set_client_id(null);
     if (
       cursorManagerRef.current !== null &&
-      change_handler !== null &&
+      change_handler_ref.current !== null &&
       editorInstance.current
     ) {
       setCursors([]);
@@ -120,27 +165,22 @@ if __name__ == '__main__':
   }, [room_id]);
 
   useEffect(() => {
-    if (roomId && roomId.startsWith("#r-")) {
+    if (roomId) {
       set_room_id(roomId);
       set_pot_room_id(roomId);
     }
   }, [roomId]);
 
+  useEffect(() => {
+    if (change_handler_ref.current) {
+      change_handler_ref.current.set_callback(enqueue_text);
+    }
+  }, [enqueue_text]);
+
   let editorInstance = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   // Function to send updates to server
-  const sendUpdateToServer = (deltas: Delta[]) => {
-    if (deltas.length === 0) return;
 
-    logger.editor.debug("Sending deltas to server:", deltas);
-    // Send deltas to WebSocket server
-    if (isConnected) {
-      sendMessage({
-        type: "update",
-        deltas: deltas,
-      });
-    }
-  };
   function handleEditorMount(
     editor: editor.IStandaloneCodeEditor,
     _monaco: typeof import("monaco-editor"),
@@ -148,7 +188,7 @@ if __name__ == '__main__':
     editorInstance.current = editor;
 
     // Initialize change handler with callback
-    set_change_handler(new EditorChangeHandler(editor, sendUpdateToServer));
+    change_handler_ref.current = new EditorChangeHandler(editor, enqueue_text);
     // Initialize cursor manager for remote cursors only
 
     const manager = new CursorManager(editor, setCursors);
@@ -207,12 +247,6 @@ if __name__ == '__main__':
 
     // Request initial document content when connected
   }
-  // Function to update a cursor position
-  const updateCursorPosition = (id: string, pos: number, ln: number) => {
-    if (cursorManagerRef.current) {
-      cursorManagerRef.current.updateCursor(id, { pos, ln });
-    }
-  };
 
   return (
     <div style={{ height: "100vh", display: "flex" }}>
@@ -280,7 +314,7 @@ if __name__ == '__main__':
           options={{
             minimap: { enabled: false },
             fontSize: 14,
-            readOnly: !isConnected,
+            readOnly: !isConnected || force_read_only,
           }}
         />
       </div>

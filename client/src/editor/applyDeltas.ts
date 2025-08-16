@@ -1,10 +1,12 @@
 import { editor } from "monaco-editor";
 
-export interface PreDelta {
-  type: "insert" | "delete" | "replace";
-  pos: number;
-  ln: number;
-  data: string;
+export interface DeltaWithOffset {
+  startLine: number;
+  startCol: number;
+  endLine: number;
+  endCol: number;
+  text: string;
+  offset: number;
 }
 
 export interface Delta {
@@ -78,7 +80,7 @@ const compare_strict = (
   return c1 < c2;
 };
 
-const text_shift = (text: string): [number, number] => {
+export const text_shift = (text: string): [number, number] => {
   // split text by newlines, then find the number of newlines and the length of the last row of text
   if (text.length === 0) {
     return [0, 0];
@@ -94,9 +96,9 @@ const text_shift = (text: string): [number, number] => {
 };
 
 export const transformdelta = (
-  source_delta: Delta,
+  source_delta: DeltaWithOffset,
   base_delta: Delta,
-): Delta => {
+): DeltaWithOffset => {
   console.log("at hte entrypint");
   if (
     compare_equal(
@@ -133,6 +135,7 @@ export const transformdelta = (
           ? base_end_col + source_delta.endCol - base_delta.endCol
           : source_delta.endCol,
       text: source_delta.text,
+      offset: 0,
     };
   } else if (
     compare_equal(
@@ -148,6 +151,7 @@ export const transformdelta = (
       endLine: source_delta.endLine,
       endCol: source_delta.endCol,
       text: source_delta.text,
+      offset: 0,
     };
   } else if (
     compare_equal(
@@ -179,6 +183,7 @@ export const transformdelta = (
           ? base_end_col + source_delta.endCol - base_delta.endCol
           : source_delta.endCol,
       text: source_delta.text,
+      offset: 0,
     };
   } else if (
     compare_strict(
@@ -194,6 +199,7 @@ export const transformdelta = (
       endLine: source_delta.endLine,
       endCol: source_delta.endCol,
       text: source_delta.text,
+      offset: 0,
     };
     return transformdelta(new_source_delta, base_delta);
   } else {
@@ -212,6 +218,7 @@ export const transformdelta = (
       endLine: base_delta.startLine,
       endCol: base_delta.startCol,
       text: source_delta.text,
+      offset: 0,
     };
     return transformdelta(new_source_delta, base_delta);
   }

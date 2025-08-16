@@ -59,7 +59,7 @@ export function validateMessage(message: any): MessageType | null {
           return message as ConnectMessage;
         }
         break;
-      case "text":
+      case "update":
         if (
           typeof message.content === "string" &&
           typeof message.client_id === "string"

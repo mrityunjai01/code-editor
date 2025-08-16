@@ -4,7 +4,6 @@ import { InitialDumpMessage } from "./types";
 
 interface WebSocketOptions {
   url: string;
-  onMessage: (message: any) => void;
   room_id: string;
   user_name: string;
   client_id: string | null;
@@ -12,6 +11,7 @@ interface WebSocketOptions {
   set_client_id: (arg: any) => void;
   editor_ready: boolean;
   setCursors: (cursors: any[]) => void; // Optional, for cursor management
+  set_attempt_connect: any;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Event) => void;
@@ -20,11 +20,11 @@ interface WebSocketOptions {
 export const useWebSocket = (options: WebSocketOptions) => {
   const {
     url,
-    onMessage,
     room_id,
     user_name,
     client_id,
     set_is_connected,
+    set_attempt_connect,
     set_client_id,
     editor_ready,
     setCursors,
@@ -70,14 +70,18 @@ export const useWebSocket = (options: WebSocketOptions) => {
             }),
           );
         }
+        set_attempt_connect((prev: boolean) => !prev);
 
         onConnect?.();
       };
 
-      ws.onmessage = onMessage;
-
-      ws.onclose = () => {
-        logger.websocket.info("WebSocket disconnected");
+      ws.onclose = (event) => {
+        logger.websocket.info(
+          "WebSocket closed:",
+          event.code,
+          event.reason,
+          event.wasClean,
+        );
         set_is_connected(false);
         set_client_id(null);
         setTriggerReconnect((prev) => !prev);
@@ -93,28 +97,7 @@ export const useWebSocket = (options: WebSocketOptions) => {
     } catch (error) {
       logger.websocket.error("Error creating WebSocket connection:", error);
     }
-  }, [
-    url,
-    room_id,
-    user_name,
-    client_id,
-    onConnect,
-    onDisconnect,
-    onError,
-    onMessage,
-  ]);
-
-  const sendMessage = useCallback((message: any) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      logger.websocket.debug("sending message", message);
-      wsRef.current.send(JSON.stringify(message));
-    } else {
-      logger.websocket.warn(
-        "WebSocket is not connected. Message not sent:",
-        message,
-      );
-    }
-  }, []);
+  }, [url, room_id, user_name, client_id, onConnect, onDisconnect, onError]);
 
   const disconnect = useCallback(() => {
     logger.websocket.info("disconnecting");
@@ -152,15 +135,7 @@ export const useWebSocket = (options: WebSocketOptions) => {
     }
   }, [editor_ready, client_id, trigger_reconnect]);
 
-  useEffect(() => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.onmessage = onMessage;
-    }
-  }, [onMessage, client_id, setCursors, room_id]);
-
   return {
-    sendMessage,
-    disconnect,
-    reconnect: connect,
+    wsRef,
   };
 };

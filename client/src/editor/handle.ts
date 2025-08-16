@@ -1,11 +1,13 @@
 import { editor } from "monaco-editor";
-import { Delta, PreDelta, applyDeltasToEditor } from "./applyDeltas";
+import { Delta, DeltaWithOffset, applyDeltasToEditor } from "./applyDeltas";
 import { logger } from "../utils/logger";
 
 export class EditorChangeHandler {
-  private cumulativeDeltas: Delta[] = [];
+  private cumulativeDeltas: DeltaWithOffset[] = [];
   private editorInstance: editor.IStandaloneCodeEditor | null = null;
   private onChangesCallback?: (deltas: Delta[]) => void;
+  private saved_state: editor.ICodeEditorViewState | null = null;
+  private ignore_changes_count: number = 0;
 
   constructor(
     editorInstance?: editor.IStandaloneCodeEditor,
@@ -21,140 +23,145 @@ export class EditorChangeHandler {
     }
   }
 
+  public get_deltas(): Delta[] {
+    return this.cumulativeDeltas;
+  }
+
+  public set_callback(callback: (deltas: Delta[]) => void) {
+    this.onChangesCallback = callback;
+  }
+
+  public save_state() {
+    if (this.editorInstance) {
+      this.saved_state = this.editorInstance.saveViewState();
+      console.log("saved state:", this.saved_state);
+    }
+  }
+
+  public restore_state(deltas: Delta[] = []) {
+    if (this.editorInstance && this.saved_state) {
+      this.editorInstance.restoreViewState(this.saved_state);
+    }
+  }
+
+  public change_handler_flush() {
+    if (this.editorInstance && this.onChangesCallback) {
+      logger.editor.debug("Flushing changes:", this.cumulativeDeltas);
+      this.onChangesCallback(
+        this.cumulativeDeltas.map((delta) => {
+          return {
+            startLine: delta.startLine,
+            startCol: delta.startCol,
+            endLine: delta.endLine,
+            endCol: delta.endCol,
+            text: delta.text,
+          };
+        }),
+      );
+
+      this.cumulativeDeltas = [];
+    }
+  }
+
   private setupChangeListener() {
     if (!this.editorInstance || !this.onChangesCallback) return;
 
     this.editorInstance.onDidChangeModelContent((e) => {
-      const deltas: Delta[] = e.changes.map((change) => {
-        logger.editor.debug("Change detected:", change);
+      logger.editor.debug("model change content: ", e);
+      logger.editor.debug(
+        "model editor change count ",
+        e.changes.length,
+        " compared to ignore count",
+        this.ignore_changes_count,
+      );
+      const deltas: DeltaWithOffset[] = e.changes
+        .slice(this.ignore_changes_count)
+        .map((change) => {
+          logger.editor.debug("Change detected:", change);
 
-        return {
-          startLine: change.range.startLineNumber,
-          startCol: change.range.startColumn,
-          endLine: change.range.endLineNumber,
-          endCol: change.range.endColumn,
-          text: change.text,
-        };
-      });
+          return {
+            startLine: change.range.startLineNumber,
+            startCol: change.range.startColumn,
+            endLine: change.range.endLineNumber,
+            endCol: change.range.endColumn,
+            text: change.text,
+            offset: change.rangeOffset,
+          };
+        });
 
       deltas.forEach((delta) => {
         this.add_change(delta);
       });
 
-      if (this.onChangesCallback) {
-        this.onChangesCallback(deltas);
-      }
+      this.ignore_changes_count = Math.max(
+        0,
+        this.ignore_changes_count - e.changes.length,
+      );
     });
   }
 
-  private add_change(predelta: PreDelta) {
+  private add_change(delta: DeltaWithOffset) {
+    console.log("Adding change:", delta);
+
     const lastDelta = this.cumulativeDeltas[this.cumulativeDeltas.length - 1];
 
-    // Try to merge with the last delta if they're compatible
-    if (lastDelta && this.canMergeDeltas(lastDelta, predelta)) {
-      const mergedDelta = this.mergeDeltas(lastDelta, predelta);
-      this.cumulativeDeltas[this.cumulativeDeltas.length - 1] = mergedDelta;
-      logger.editor.debug("Merged delta:", mergedDelta);
+    if (lastDelta) {
+      const mergedDelta = this.mergeDeltas(lastDelta, delta);
+      if (mergedDelta) {
+        this.cumulativeDeltas[this.cumulativeDeltas.length - 1] = mergedDelta;
+        logger.editor.debug("Merged delta:", mergedDelta);
+      }
     } else {
       if (lastDelta) {
-        logger.editor.debug("cant merge deltas:", lastDelta, predelta);
-        logger.editor.debug("cant merge deltas:", lastDelta, predelta);
+        logger.editor.debug("cant merge deltas:", lastDelta, delta);
       }
-      this.cumulativeDeltas.push(predelta_to_delta(predelta));
+      console.log("cant merge, pushed ", delta);
+      this.cumulativeDeltas.push(delta);
     }
   }
 
-  private canMergeDeltas(delta1: Delta, delta2: PreDelta): boolean {
-    if (delta1.ln !== delta2.ln || delta2.type == "replace") return false;
-
-    if (delta1.type === "insert" && delta2.type === "insert") {
-      return delta2.pos === delta1.pos + (delta1.data?.length || 0);
-    }
-
-    if (delta1.type === "delete" && delta2.type === "delete") {
-      return delta1.pos === delta2.pos + (delta1.steps || 0);
-    }
-    return false;
-  }
-
-  private mergeDeltas(delta1: Delta, delta2: PreDelta): Delta {
-    if (delta1.type === "insert" && delta2.type === "insert") {
+  private mergeDeltas(
+    delta1: DeltaWithOffset,
+    delta2: DeltaWithOffset,
+  ): DeltaWithOffset | null {
+    if (delta1.offset + delta1.text.length === delta2.offset) {
       return {
-        type: "insert",
-        pos: delta1.pos,
-        ln: delta1.ln,
-        data: (delta1.data || "") + (delta2.data || ""),
+        startLine: delta1.startLine,
+        startCol: delta1.startCol,
+        endLine: delta1.endLine,
+        endCol: delta1.endCol,
+        text: delta1.text.concat(delta2.text),
+        offset: delta1.offset,
+      };
+    }
+    if (
+      delta2.offset + delta2.text.length === delta1.offset &&
+      delta2.text === "" &&
+      delta1.text === ""
+    ) {
+      return {
+        startLine: delta2.startLine,
+        startCol: delta2.startCol,
+        endLine: delta1.endLine,
+        endCol: delta1.endCol,
+        text: "",
+        offset: delta2.offset,
       };
     }
 
-    if (delta1.type === "delete" && delta2.type === "delete") {
-      return {
-        type: "delete",
-        pos: delta1.pos,
-        ln: delta1.ln,
-        steps: (delta1.steps || 0) + (delta2.steps || 0),
-      };
-    }
-
-    // Fallback - should not reach here if canMergeDeltas works correctly
-    logger.editor.warn("Merging incompatible deltas:", delta1, delta2);
-    return delta2;
+    return null;
   }
 
-  applyDeltas(deltas: Delta[]) {
+  public applyDeltas(deltas: Delta[]) {
     if (!this.editorInstance) {
       logger.editor.error("No editor instance available");
       return;
     }
-
+    this.ignore_changes_count = deltas.length;
     applyDeltasToEditor(this.editorInstance, deltas);
   }
-}
 
-function predelta_to_delta(predelta: PreDelta): Delta {
-  if (predelta.type === "insert") {
-    const n_lines = (predelta.data || "").split("\n").length;
-    const last_col =
-      n_lines == 0
-        ? predelta.pos + predelta.data.length
-        : predelta.data.length - predelta.data?.lastIndexOf("\n") || 0;
-
-    return {
-      startLine: predelta.ln,
-      startCol: predelta.pos,
-      endLine: predelta.ln,
-      endCol: predelta.pos + (predelta.data?.length || 0),
-      text: predelta.data || "",
-    };
-  } else if (predelta.type === "delete") {
-    const n_lines = (predelta.data || "").split("\n").length;
-    const last_col =
-      n_lines == 0
-        ? predelta.pos + predelta.data.length
-        : predelta.data.length - predelta.data?.lastIndexOf("\n") || 0;
-    return {
-      startLine: predelta.ln,
-      startCol: predelta.pos,
-      endLine: predelta.ln,
-      endCol: predelta.pos + last_col,
-      text: "",
-    };
-  } else if (predelta.type === "replace") {
-    return {
-      startLine: predelta.ln,
-      startCol: predelta.pos,
-      endLine: predelta.ln,
-      endCol: predelta.pos + (predelta.data?.length || 0),
-      text: predelta.data || "",
-    };
-  } else {
-    console.error("Unknown predelta type:", predelta.type);
-    return {
-      startLine: 0,
-      startCol: 0,
-      endLine: 0,
-      endCol: 0,
-      text: "",
-    };
+  public first_message() {
+    this.ignore_changes_count = 1;
   }
 }

@@ -1,6 +1,6 @@
-import { useCallback } from "react";
 import { CursorManager, Cursor, DEFAULT_COLORS } from "../editor/cursors";
 import { logger } from "../utils/logger";
+import { Delta, transformdelta } from "../editor/applyDeltas";
 
 export const handleMessagesFunctionWrapper = (
   set_is_connected: (arg: boolean) => void,
@@ -9,6 +9,9 @@ export const handleMessagesFunctionWrapper = (
   cursorManagerRef: React.MutableRefObject<CursorManager | null>,
   client_id: string | null,
   setCursors: (cursors: Cursor[]) => void,
+  set_force_read_only: (r: boolean) => void,
+  change_handler_ref: any,
+  queue_manager_ref: any,
 ) => {
   return (event: any) => {
     logger.websocket.debug("received message:", event.data);
@@ -74,7 +77,6 @@ export const handleMessagesFunctionWrapper = (
         } else if (message.type === "removeclient") {
           if (cursorManagerRef.current) {
             logger.cursor.info("Remove clients:", message.clients);
-            const currentCursors = cursorManagerRef.current.getCursors();
             for (const client of message.clients) {
               cursorManagerRef.current.removeCursor(client.client_id);
               setCursors(cursorManagerRef.current.getCursors());
@@ -86,14 +88,72 @@ export const handleMessagesFunctionWrapper = (
           }
         } else if (message.type === "initial_dump") {
           // Handle initial document content
+          change_handler_ref.current.first_message();
+
           set_editor_value(message.content);
+          change_handler_ref.current.save_state();
+
           logger.editor.info("Received initial document:", message.content);
         } else if (message.type === "input_response") {
           // Handle input response with recent deltas
-          const deltas = message.deltas || [];
         } else if (message.type === "text_accepted") {
           // Handle text accepted response
           logger.editor.info("Text accepted:", message.count);
+          set_force_read_only(true);
+          console.assert(
+            queue_manager_ref.current,
+            "Queue manager is not initialized",
+          );
+          console.debug("received text accept");
+          console.debug(
+            "applying updates: ",
+            queue_manager_ref.current.get_prefix_updates(message.count),
+          );
+          console.debug(
+            "applying updates: ",
+            queue_manager_ref.current.get_suffix_updates(message.count),
+          );
+          console.debug(
+            "change handler updates,",
+            change_handler_ref.current.get_deltas(),
+          );
+          change_handler_ref.current.restore_state();
+          change_handler_ref.current.applyDeltas(
+            queue_manager_ref.current.get_prefix_updates(message.count),
+          );
+          change_handler_ref.current.save_state();
+          change_handler_ref.current.applyDeltas(
+            queue_manager_ref.current.get_suffix_updates(message.count),
+          );
+          change_handler_ref.current.applyDeltas(
+            change_handler_ref.current.get_deltas(),
+          );
+          set_force_read_only(false);
+          queue_manager_ref.current.accept_text_updates(message.count);
+        } else if (message.type === "update") {
+          // update
+          const base_updates: Delta[] = message.updates || [];
+          const source_updates =
+            queue_manager_ref.current.get_suffix_updates(0) +
+            change_handler_ref.current.get_deltas();
+          const transformed_source_updates: Delta[] = source_updates.map(
+            (update: any) => {
+              let new_update = update;
+              for (const base_update of base_updates) {
+                new_update = transformdelta(new_update, base_update);
+              }
+              return new_update;
+            },
+          );
+
+          set_force_read_only(true);
+          change_handler_ref.current.applyDeltas(
+            base_updates.concat(transformed_source_updates),
+          );
+          set_force_read_only(false);
+          queue_manager_ref.current.increment_last_text_update_msg_id(
+            base_updates.length,
+          );
         }
       }
     } catch (error) {
