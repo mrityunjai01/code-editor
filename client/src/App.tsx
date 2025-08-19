@@ -48,6 +48,7 @@ function App() {
     ln: 0,
   });
   const [isConnected, set_is_connected] = useState(false);
+  const [sec_key, set_sec_key] = useState("k");
   const [client_id, set_client_id] = useState(null);
   const [attempt_connect, set_attempt_connect] = useState(false);
   const change_handler_ref = useRef<EditorChangeHandler | null>(null);
@@ -61,6 +62,7 @@ if __name__ == '__main__':
   const [editor_value, set_editor_value] = useState(defaultValue);
   const { wsRef } = useWebSocket({
     url: "ws://localhost:8000/ws",
+    sec_key,
     room_id,
     user_name: user_name_ref.current,
     client_id,
@@ -73,13 +75,12 @@ if __name__ == '__main__':
   });
 
   useEffect(() => {
-    console.log("WebSocket reference updated:", wsRef.current);
+    logger.websocket.debug("WebSocket reference updated:", wsRef.current);
     if (wsRef.current) {
-      console.log("Setting up WebSocket message handler");
+      logger.websocket.debug("Setting up WebSocket message handler");
       wsRef.current.onmessage = handleMessagesFunctionWrapper(
         set_is_connected,
         set_client_id,
-        set_editor_value,
         cursorManagerRef,
         client_id,
         setCursors,
@@ -93,7 +94,6 @@ if __name__ == '__main__':
 
   const queue_manager_ref = useRef<QueueManager>(
     new QueueManager((message: MessageType) => {
-      console.log("Queue manager sending message:", message);
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         if (message.type === "update") {
           logger.websocket.debug("sending message", message);
@@ -247,6 +247,11 @@ if __name__ == '__main__':
 
     // Request initial document content when connected
   }
+  const input_style = {
+    borderRadius: "8px",
+    border: "1px solid #ccc",
+    padding: "4px 12px",
+  };
 
   return (
     <div style={{ height: "100vh", display: "flex" }}>
@@ -274,9 +279,7 @@ if __name__ == '__main__':
             <input
               type="text"
               style={{
-                borderRadius: "8px",
-                border: "1px solid #ccc",
-                padding: "4px 12px",
+                ...input_style,
                 marginRight: "10px",
               }}
               placeholder="Enter room name"
@@ -284,6 +287,19 @@ if __name__ == '__main__':
               onChange={(e) => {
                 set_pot_room_id(e.target.value);
                 set_change_room_button_disabled(false);
+              }}
+            />
+            <span style={{ marginLeft: "10px" }}>Key: </span>
+            <input
+              type="text"
+              style={{
+                ...input_style,
+                marginRight: "10px",
+              }}
+              placeholder="Enter room name"
+              value={sec_key}
+              onChange={(e) => {
+                set_sec_key(e.target.value);
               }}
             />
             <button

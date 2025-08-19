@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { logger } from "../utils/logger";
-import { InitialDumpMessage } from "./types";
+import { generateToken } from "../utils/auth";
 
 interface WebSocketOptions {
   url: string;
+  sec_key: string;
   room_id: string;
   user_name: string;
   client_id: string | null;
@@ -20,6 +21,7 @@ interface WebSocketOptions {
 export const useWebSocket = (options: WebSocketOptions) => {
   const {
     url,
+    sec_key,
     room_id,
     user_name,
     client_id,
@@ -39,11 +41,13 @@ export const useWebSocket = (options: WebSocketOptions) => {
   const [trigger_reconnect, setTriggerReconnect] = useState(false);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     try {
+      logger.websocket.info("Connecting to WebSocket at", url);
       wsRef.current = new WebSocket(url);
       const ws = wsRef.current;
 
+      const token = await generateToken("default", sec_key);
       ws.onopen = () => {
         setReconnectAttempts(0);
         logger.websocket.info(
@@ -58,6 +62,7 @@ export const useWebSocket = (options: WebSocketOptions) => {
               type: "connect",
               room_id: room_id,
               name: user_name,
+              token: token,
             }),
           );
         } else {
@@ -67,6 +72,7 @@ export const useWebSocket = (options: WebSocketOptions) => {
               room_id: room_id,
               name: user_name,
               client_id: client_id,
+              token: token,
             }),
           );
         }
@@ -113,12 +119,20 @@ export const useWebSocket = (options: WebSocketOptions) => {
   }, []);
 
   useEffect(() => {
+    logger.websocket.info(
+      "useWebSocket effect triggered with editor_ready:",
+      editor_ready,
+      "client_id:",
+      client_id,
+      "trigger_reconnect:",
+      trigger_reconnect,
+    );
     if (editor_ready) {
       if (!client_id) {
         if (reconnectAttempts < maxReconnectAttempts) {
           setReconnectAttempts((prev) => prev + 1);
-          reconnectTimeoutRef.current = setTimeout(() => {
-            connect();
+          reconnectTimeoutRef.current = setTimeout(async () => {
+            await connect();
           }, 1000);
           return () => {
             if (reconnectTimeoutRef.current) {

@@ -1,4 +1,4 @@
-import { Delta } from "../editor/applyDeltas";
+import { Delta } from "../editor/types";
 
 export interface ConnectAckResponse {
   type: "connect_ack";
@@ -37,11 +37,13 @@ export interface TypingResponse {
 export interface InitialDumpResponse {
   type: "initial_dump";
   content: string;
+  last_msg_id: number;
 }
 
 export interface TextResponse {
   type: "update";
   deltas: Delta[];
+  start_msg_id: number;
 }
 export interface TextAcceptedResponse {
   type: "text_accepted";

@@ -1,20 +1,27 @@
 import { editor } from "monaco-editor";
-import { Delta, DeltaWithOffset, applyDeltasToEditor } from "./applyDeltas";
+import { applyDeltasToEditor, applyDelta } from "./applyDeltas";
+import { Delta, DeltaWithOffset, DocModel } from "./types";
 import { logger } from "../utils/logger";
 
 export class EditorChangeHandler {
   private cumulativeDeltas: DeltaWithOffset[] = [];
   private editorInstance: editor.IStandaloneCodeEditor | null = null;
-  private onChangesCallback?: (deltas: Delta[]) => void;
+  private onChangesCallback?: (deltas: DeltaWithOffset[]) => void;
   private saved_state: editor.ICodeEditorViewState | null = null;
   private ignore_changes_count: number = 0;
+  private docModel: DocModel;
 
   constructor(
     editorInstance?: editor.IStandaloneCodeEditor,
-    onChangesCallback?: (deltas: Delta[]) => void,
+    onChangesCallback?: (deltas: DeltaWithOffset[]) => void,
   ) {
     if (editorInstance) {
       this.editorInstance = editorInstance;
+      // Initialize document model from editor content
+      const content = editorInstance.getValue();
+      this.docModel = { lines: content.split("\n") };
+    } else {
+      this.docModel = { lines: [""] };
     }
     this.onChangesCallback = onChangesCallback;
 
@@ -27,18 +34,38 @@ export class EditorChangeHandler {
     return this.cumulativeDeltas;
   }
 
-  public set_callback(callback: (deltas: Delta[]) => void) {
+  public getDocModel(): DocModel {
+    return this.docModel;
+  }
+
+  public applyDeltaToModel(delta: Delta): void {
+    applyDelta(this.docModel, delta);
+    logger.editor.debug(
+      "Applied delta to document model:",
+      delta,
+      "Model state:",
+      this.docModel,
+    );
+  }
+
+  public set_callback(callback: (deltas: DeltaWithOffset[]) => void) {
     this.onChangesCallback = callback;
+  }
+
+  public set_content(content: string) {
+    if (this.editorInstance) {
+      this.editorInstance.setValue(content);
+    }
   }
 
   public save_state() {
     if (this.editorInstance) {
       this.saved_state = this.editorInstance.saveViewState();
-      console.log("saved state:", this.saved_state);
+      logger.editor.debug("saved state:", this.saved_state);
     }
   }
 
-  public restore_state(deltas: Delta[] = []) {
+  public restore_state() {
     if (this.editorInstance && this.saved_state) {
       this.editorInstance.restoreViewState(this.saved_state);
     }
@@ -55,12 +82,18 @@ export class EditorChangeHandler {
             endLine: delta.endLine,
             endCol: delta.endCol,
             text: delta.text,
+            source_text: delta.source_text,
+            offset: delta.offset,
           };
         }),
       );
 
       this.cumulativeDeltas = [];
     }
+  }
+
+  public clear_deltas() {
+    this.cumulativeDeltas = [];
   }
 
   private setupChangeListener() {
@@ -79,12 +112,20 @@ export class EditorChangeHandler {
         .map((change) => {
           logger.editor.debug("Change detected:", change);
 
+          // Extract the source text that was replaced
+          const model = this.editorInstance?.getModel();
+          let sourceText = "";
+          if (model) {
+            sourceText = model.getValueInRange(change.range);
+          }
+
           return {
             startLine: change.range.startLineNumber,
             startCol: change.range.startColumn,
             endLine: change.range.endLineNumber,
             endCol: change.range.endColumn,
             text: change.text,
+            source_text: sourceText,
             offset: change.rangeOffset,
           };
         });
@@ -101,7 +142,7 @@ export class EditorChangeHandler {
   }
 
   private add_change(delta: DeltaWithOffset) {
-    console.log("Adding change:", delta);
+    logger.editor.debug("Adding change:", delta);
 
     const lastDelta = this.cumulativeDeltas[this.cumulativeDeltas.length - 1];
 
@@ -110,12 +151,12 @@ export class EditorChangeHandler {
       if (mergedDelta) {
         this.cumulativeDeltas[this.cumulativeDeltas.length - 1] = mergedDelta;
         logger.editor.debug("Merged delta:", mergedDelta);
+      } else {
+        logger.editor.debug("cant merge deltas:", lastDelta, delta);
+        this.cumulativeDeltas.push(delta);
       }
     } else {
-      if (lastDelta) {
-        logger.editor.debug("cant merge deltas:", lastDelta, delta);
-      }
-      console.log("cant merge, pushed ", delta);
+      logger.editor.debug("cant merge, pushed ", delta);
       this.cumulativeDeltas.push(delta);
     }
   }
@@ -131,6 +172,7 @@ export class EditorChangeHandler {
         endLine: delta1.endLine,
         endCol: delta1.endCol,
         text: delta1.text.concat(delta2.text),
+        source_text: delta1.source_text.concat(delta2.source_text),
         offset: delta1.offset,
       };
     }
@@ -145,6 +187,7 @@ export class EditorChangeHandler {
         endLine: delta1.endLine,
         endCol: delta1.endCol,
         text: "",
+        source_text: delta2.source_text + delta1.source_text,
         offset: delta2.offset,
       };
     }

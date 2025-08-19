@@ -1,10 +1,5 @@
-import {
-  getTextSpan,
-  Delta,
-  rDelta,
-  reverseDelta,
-  transformRDelta,
-} from "../../editor/applyDeltas";
+import { getTextSpan, transformdelta } from "../../editor/applyDeltas";
+import { Delta, DeltaWithOffset } from "../../editor/types";
 
 describe("Helper Functions", () => {
   describe("getTextSpan", () => {
@@ -43,56 +38,16 @@ describe("Helper Functions", () => {
     });
   });
 
-  describe("reverseDelta", () => {
-    test("reverse addition of single line", () => {
-      const rd = {
-        startLine: 1,
-        startCol: 1,
-        endLine: 1,
-        endCol: 1,
-        text: "hello",
-        sourceText: "",
-      };
-      const reversed_delta = reverseDelta(rd);
-      expect(reversed_delta).toEqual({
-        startLine: 1,
-        startCol: 1,
-        endLine: 1,
-        endCol: 6,
-        sourceText: "hello",
-        text: "",
-      });
-    });
-
-    test("reverse addition of multi-line text", () => {
-      const rd = {
-        startLine: 1,
-        startCol: 4,
-        endLine: 1,
-        endCol: 6,
-        text: "line1\nline2",
-        sourceText: "lk",
-      };
-      const reversed_delta = reverseDelta(rd);
-      expect(reversed_delta).toEqual({
-        startLine: 1,
-        startCol: 4,
-        endLine: 2,
-        endCol: 6,
-        sourceText: "line1\nline2",
-        text: "lk",
-      });
-    });
-  });
-  describe("transformRDelta", () => {
+  describe("transformdelta", () => {
     test("case1: short + shortend, base delta contained inside source delta", () => {
-      const sourceDelta: rDelta = {
+      const sourceDelta: DeltaWithOffset = {
         startLine: 1,
         startCol: 1,
         endLine: 1,
         endCol: 6,
         text: "jungle",
-        sourceText: "world",
+        source_text: "world",
+        offset: 0,
       };
       const baseDelta: Delta = {
         startLine: 1,
@@ -101,25 +56,27 @@ describe("Helper Functions", () => {
         endCol: 3,
         text: "XX",
       };
-      const result = transformRDelta(sourceDelta, baseDelta);
+      const result = transformdelta(sourceDelta, baseDelta);
       expect(result).toEqual({
         startLine: 1,
         startCol: 1,
         endLine: 1,
         endCol: 7,
         text: "jungle",
-        sourceText: "wXXrld",
+        source_text: "wXXrld",
+        offset: 0,
       });
     });
 
     test("case1: long + shortend, base delta contained inside source delta", () => {
-      const sourceDelta: rDelta = {
+      const sourceDelta: DeltaWithOffset = {
         startLine: 1,
         startCol: 1,
         endLine: 2,
         endCol: 6,
         text: "jungle",
-        sourceText: "world\njuice",
+        source_text: "wi\nworldo",
+        offset: 0,
       };
       const baseDelta: Delta = {
         startLine: 1,
@@ -128,25 +85,28 @@ describe("Helper Functions", () => {
         endCol: 3,
         text: "XX",
       };
-      const result = transformRDelta(sourceDelta, baseDelta);
+      const result = transformdelta(sourceDelta, baseDelta);
       expect(result).toEqual({
         startLine: 1,
         startCol: 1,
         endLine: 2,
         endCol: 6,
         text: "jungle",
-        sourceText: "wXXrld\njuice",
+        source_text: "wXX\nworldo",
+        offset: 0,
       });
     });
 
     test("case1: long + longend, base delta contained inside source delta", () => {
-      const sourceDelta: rDelta = {
+      const sourceDelta: DeltaWithOffset = {
         startLine: 1,
         startCol: 3,
         endLine: 3,
         endCol: 7,
         text: "jungle\nchicken\nchicken",
-        sourceText: "world\njuice\norange",
+        // source_text: "helpmore\nhelpmore\nhelpmore",
+        source_text: "lpmore\nhelpmore\nhelpmo",
+        offset: 0,
       };
       const baseDelta: Delta = {
         startLine: 1,
@@ -155,25 +115,27 @@ describe("Helper Functions", () => {
         endCol: 3,
         text: "X\nX",
       };
-      const result = transformRDelta(sourceDelta, baseDelta);
+      const result = transformdelta(sourceDelta, baseDelta);
       expect(result).toEqual({
         startLine: 1,
         startCol: 3,
         endLine: 3,
         endCol: 7,
         text: "jungle\nchicken\nchicken",
-        sourceText: "worX\nXice\norange",
+        source_text: "lpmX\nXlpmore\nhelpmo",
+        offset: 0,
       });
     });
 
     test("case1: long + longend, base delta contained inside source delta", () => {
-      const sourceDelta: rDelta = {
+      const sourceDelta: DeltaWithOffset = {
         startLine: 1,
         startCol: 3,
         endLine: 3,
         endCol: 7,
         text: "jungle\nchicken\nchicken",
-        sourceText: "world\njuice\norange",
+        source_text: "lpmore\nhelpmore\nhelpmo",
+        offset: 0,
       };
       const baseDelta: Delta = {
         startLine: 1,
@@ -182,14 +144,15 @@ describe("Helper Functions", () => {
         endCol: 3,
         text: "XX",
       };
-      const result = transformRDelta(sourceDelta, baseDelta);
+      const result = transformdelta(sourceDelta, baseDelta);
       expect(result).toEqual({
         startLine: 1,
         startCol: 3,
         endLine: 2,
         endCol: 7,
         text: "jungle\nchicken\nchicken",
-        sourceText: "worXXice\norange",
+        source_text: "lpmXXlpmore\nhelpmo",
+        offset: 0,
       });
     });
 
@@ -201,22 +164,168 @@ describe("Helper Functions", () => {
         endCol: 2,
         text: "\ncc",
       };
-      const source: rDelta = {
+      const source: DeltaWithOffset = {
         startLine: 2,
         startCol: 5,
         endLine: 2,
         endCol: 7,
-        sourceText: "ke",
         text: "",
+        source_text: "ke",
+        offset: 0,
       };
-      const result = transformRDelta(source, base);
+      const result = transformdelta(source, base);
       expect(result).toEqual({
         startLine: 2,
         startCol: 6,
         endLine: 2,
         endCol: 8,
-        sourceText: "ke",
         text: "",
+        source_text: "ke",
+        offset: 0,
+      });
+    });
+
+    test("base before source short end", () => {
+      const base: Delta = {
+        startLine: 1,
+        startCol: 7,
+        endLine: 2,
+        endCol: 2,
+        text: "d\ncc",
+      };
+      const source: DeltaWithOffset = {
+        startLine: 2,
+        startCol: 5,
+        endLine: 2,
+        endCol: 7,
+        text: "ke",
+        source_text: "",
+        offset: 0,
+      };
+      const result = transformdelta(source, base);
+      expect(result).toEqual({
+        startLine: 2,
+        startCol: 6,
+        endLine: 2,
+        endCol: 8,
+        text: "ke",
+        source_text: "",
+        offset: 0,
+      });
+    });
+
+    test("base before source long end", () => {
+      const base: Delta = {
+        startLine: 1,
+        startCol: 7,
+        endLine: 2,
+        endCol: 2,
+        text: "d\ncc",
+      };
+      const source: DeltaWithOffset = {
+        startLine: 3,
+        startCol: 5,
+        endLine: 3,
+        endCol: 7,
+        text: "ke",
+        source_text: "",
+        offset: 0,
+      };
+      const result = transformdelta(source, base);
+      expect(result).toEqual({
+        startLine: 3,
+        startCol: 5,
+        endLine: 3,
+        endCol: 7,
+        text: "ke",
+        source_text: "",
+        offset: 0,
+      });
+    });
+    test("base before source short end compression", () => {
+      const base: Delta = {
+        startLine: 1,
+        startCol: 7,
+        endLine: 2,
+        endCol: 2,
+        text: "cc",
+      };
+      const source: DeltaWithOffset = {
+        startLine: 2,
+        startCol: 5,
+        endLine: 2,
+        endCol: 7,
+        text: "",
+        source_text: "ke",
+        offset: 0,
+      };
+      const result = transformdelta(source, base);
+      expect(result).toEqual({
+        startLine: 1,
+        startCol: 12,
+        endLine: 1,
+        endCol: 14,
+        text: "",
+        source_text: "ke",
+        offset: 0,
+      });
+    });
+
+    test("base before source short end compression with overlap", () => {
+      const base: Delta = {
+        startLine: 1,
+        startCol: 7,
+        endLine: 2,
+        endCol: 6,
+        text: "cc",
+      };
+      const source: DeltaWithOffset = {
+        startLine: 2,
+        startCol: 5,
+        endLine: 2,
+        endCol: 7,
+        text: "",
+        source_text: "ke",
+        offset: 0,
+      };
+      const result = transformdelta(source, base);
+      expect(result).toEqual({
+        startLine: 1,
+        startCol: 9,
+        endLine: 1,
+        endCol: 10,
+        text: "",
+        source_text: "e",
+        offset: 0,
+      });
+    });
+
+    test("base after source short end  with overlap", () => {
+      const base: Delta = {
+        startLine: 1,
+        startCol: 7,
+        endLine: 1,
+        endCol: 12,
+        text: "cc",
+      };
+      const source: DeltaWithOffset = {
+        startLine: 1,
+        startCol: 4,
+        endLine: 1,
+        endCol: 8,
+        text: "",
+        source_text: "kite",
+        offset: 0,
+      };
+      const result = transformdelta(source, base);
+      expect(result).toEqual({
+        startLine: 1,
+        startCol: 4,
+        endLine: 1,
+        endCol: 7,
+        text: "",
+        source_text: "kit",
+        offset: 0,
       });
     });
 
@@ -725,4 +834,3 @@ describe("Helper Functions", () => {
     //   });
   });
 });
-

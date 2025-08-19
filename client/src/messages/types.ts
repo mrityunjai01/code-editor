@@ -1,9 +1,10 @@
-import { Delta } from "../editor/applyDeltas";
+import { Delta } from "../editor/types";
 
 export interface ConnectMessage {
   type: "connect";
   room_id: string;
   name: string;
+  token: string;
 }
 
 export interface TextMessage {

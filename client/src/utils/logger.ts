@@ -2,12 +2,14 @@ import log from "loglevel";
 
 // Log levels: TRACE, DEBUG, INFO, WARN, ERROR, SILENT
 // In production builds, console logs will be stripped by Vite anyway
-const LOG_LEVEL = 
-  process.env.NODE_ENV === "production" 
-    ? "SILENT"  // Completely silent in production
-    : process.env.NODE_ENV === "test"
-    ? "ERROR"   // Only errors in tests
-    : "DEBUG";  // Full logging in development
+// const LOG_LEVEL = process.env.REACT_LL
+//   ? process.env.REACT_LL.toUpperCase()
+//   : process.env.NODE_ENV === "production"
+//     ? "SILENT" // Completely silent in production
+//     : process.env.NODE_ENV === "test"
+//       ? "ERROR" // Only errors in tests
+//       : "DEBUG"; // Full logging in development
+const LOG_LEVEL = "DEBUG";
 
 // Configure the root logger
 log.setLevel(LOG_LEVEL as log.LogLevelDesc);

@@ -1,16 +1,26 @@
 import "@testing-library/jest-dom";
 
-// Mock Monaco Editor since it requires DOM environment
-jest.mock("monaco-editor", () => ({
-  editor: {
-    IStandaloneCodeEditor: {},
-    IModelDeltaDecoration: {},
-    IModelDecorationOptions: {},
-    TrackedRangeStickiness: {
-      NeverGrowsWhenTypingAtEdges: 1,
-    },
-  },
-}));
+// Polyfills for jsdom environment
+import { TextEncoder, TextDecoder } from 'util';
+global.TextEncoder = TextEncoder;
+global.TextDecoder = TextDecoder as any;
+
+// Mock WebSocket
+const mockWebSocket = {
+  CONNECTING: 0,
+  OPEN: 1,
+  CLOSING: 2,
+  CLOSED: 3,
+  send: jest.fn(),
+  close: jest.fn(),
+  readyState: 1,
+  onopen: null,
+  onclose: null,
+  onmessage: null,
+  onerror: null,
+};
+
+global.WebSocket = jest.fn(() => mockWebSocket) as any;
 
 // Mock @monaco-editor/react
 jest.mock("@monaco-editor/react", () => ({
