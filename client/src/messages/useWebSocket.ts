@@ -103,7 +103,16 @@ export const useWebSocket = (options: WebSocketOptions) => {
     } catch (error) {
       logger.websocket.error("Error creating WebSocket connection:", error);
     }
-  }, [url, room_id, user_name, client_id, onConnect, onDisconnect, onError]);
+  }, [
+    url,
+    room_id,
+    sec_key,
+    user_name,
+    client_id,
+    onConnect,
+    onDisconnect,
+    onError,
+  ]);
 
   const disconnect = useCallback(() => {
     logger.websocket.info("disconnecting");
@@ -147,7 +156,7 @@ export const useWebSocket = (options: WebSocketOptions) => {
         };
       }
     }
-  }, [editor_ready, client_id, trigger_reconnect]);
+  }, [editor_ready, client_id, sec_key, trigger_reconnect]);
 
   return {
     wsRef,

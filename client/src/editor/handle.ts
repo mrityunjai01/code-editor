@@ -73,7 +73,7 @@ export class EditorChangeHandler {
 
   public change_handler_flush() {
     if (this.editorInstance && this.onChangesCallback) {
-      logger.editor.debug("Flushing changes:", this.cumulativeDeltas);
+      logger.editor.debug("Flushing changes:", this.get_deltas());
       this.onChangesCallback(
         this.cumulativeDeltas.map((delta) => {
           return {
@@ -88,7 +88,7 @@ export class EditorChangeHandler {
         }),
       );
 
-      this.cumulativeDeltas = [];
+      this.clear_deltas();
     }
   }
 

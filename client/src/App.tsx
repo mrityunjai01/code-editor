@@ -49,7 +49,9 @@ function App() {
   });
   const [isConnected, set_is_connected] = useState(false);
   const [sec_key, set_sec_key] = useState("k");
+  const [pot_sec_key, set_pot_sec_key] = useState("k");
   const [client_id, set_client_id] = useState(null);
+  const [editor_ready, set_editor_ready] = useState(false);
   const [attempt_connect, set_attempt_connect] = useState(false);
   const change_handler_ref = useRef<EditorChangeHandler | null>(null);
   const cursorManagerRef = useRef<CursorManager | null>(null);
@@ -68,8 +70,7 @@ if __name__ == '__main__':
     client_id,
     set_is_connected,
     set_client_id,
-    editor_ready:
-      change_handler_ref.current !== null && cursorManagerRef.current !== null,
+    editor_ready,
     setCursors,
     set_attempt_connect,
   });
@@ -85,7 +86,6 @@ if __name__ == '__main__':
         client_id,
         setCursors,
         set_force_read_only,
-
         change_handler_ref,
         queue_manager_ref,
       );
@@ -156,7 +156,6 @@ if __name__ == '__main__':
       editorInstance.current
     ) {
       setCursors([]);
-      set_editor_value("");
       cursorManagerRef.current = new CursorManager(
         editorInstance.current,
         setCursors,
@@ -202,6 +201,7 @@ if __name__ == '__main__':
     );
     logger.cursor.info("MainCursorManager initialized:", mainManager);
     mainCursorManagerRef.current = mainManager;
+    set_editor_ready(true);
 
     // Track main cursor position and send to server
     editor.onDidChangeCursorPosition((e) => {
@@ -296,10 +296,11 @@ if __name__ == '__main__':
                 ...input_style,
                 marginRight: "10px",
               }}
-              placeholder="Enter room name"
-              value={sec_key}
+              placeholder="Enter key"
+              value={pot_sec_key}
               onChange={(e) => {
-                set_sec_key(e.target.value);
+                set_pot_sec_key(e.target.value);
+                set_change_room_button_disabled(false);
               }}
             />
             <button
@@ -311,8 +312,11 @@ if __name__ == '__main__':
               }}
               disabled={change_room_button_disabled}
               onClick={() => {
+                change_handler_ref.current?.clear_deltas();
+                queue_manager_ref.current?.clear_text_updates();
                 set_change_room_button_disabled(true);
                 set_room_id(pot_room_id);
+                set_sec_key(pot_sec_key);
               }}
             >
               Connect
