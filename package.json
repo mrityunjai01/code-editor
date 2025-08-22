@@ -1,33 +1,56 @@
 {
   "name": "collaborative-text-editor",
-  "version": "1.0.0",
-  "description": "Real-time collaborative text editor with WebSocket backend",
-  "main": "server/main.py",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "start": "cd server && python main.py",
-    "dev": "cd server && python main.py",
-    "client": "http-server client -p 3000 -c-1",
-    "dev:client": "vite client --port 3000",
-    "build:client": "vite build client",
-    "install:python": "pip install -r requirements.txt"
+    "dev": "vite",
+    "build": "vite build",
+    "build:check": "tsc -b",
+    "build:prod": "NODE_ENV=production npm run build",
+    "build:analyze": "npm run build -- --mode=analyze",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:monkey": "playwright test monkey_testing.spec.ts",
+    "test:monkey:ui": "playwright test monkey_testing.spec.ts --ui",
+    "test:monkey:headed": "playwright test monkey_testing.spec.ts --headed"
   },
   "dependencies": {
-    "ws": "^8.13.0",
-    "uuid": "^9.0.0",
-    "vue": "^3.4.0"
+    "@faker-js/faker": "^9.9.0",
+    "@monaco-editor/react": "^4.7.0",
+    "@types/react-router-dom": "^5.3.3",
+    "loglevel": "^1.9.2",
+    "monaco-editor": "^0.52.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.8.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1",
-    "http-server": "^14.1.1",
-    "vite": "^5.0.0",
-    "@vitejs/plugin-vue": "^5.0.0"
-  },
-  "keywords": [
-    "collaborative",
-    "text-editor",
-    "websocket",
-    "real-time"
-  ],
-  "author": "",
-  "license": "MIT"
+    "@eslint/js": "^9.13.0",
+    "@playwright/test": "^1.54.2",
+    "@testing-library/jest-dom": "^6.6.4",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/jest": "^30.0.0",
+    "@types/loglevel": "^1.5.4",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "eslint": "^9.13.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.14",
+    "globals": "^15.11.0",
+    "jest": "^30.0.5",
+    "jest-environment-jsdom": "^30.0.5",
+    "prettier": "^3.6.2",
+    "terser": "^5.43.1",
+    "ts-jest": "^29.4.1",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.1",
+    "vite-plugin-remove-console": "^2.2.0",
+    "whatwg-fetch": "^3.6.20"
+  }
 }
